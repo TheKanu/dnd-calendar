@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D&D Calendar</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'dnd-gold': '#d4af37',
+                        'dnd-red': '#8b0000',
+                        'dnd-dark': '#1a1a1a'
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-dnd-dark text-white min-h-screen">
+    <div class="container mx-auto p-6">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-dnd-gold mb-2">D&D Campaign Calendar</h1>
+            <p class="text-gray-300">Track your adventures and sessions</p>
+        </header>
+
+        <div class="grid lg:grid-cols-4 gap-6">
+            <!-- Calendar Section -->
+            <div class="lg:col-span-3">
+                <div class="bg-gray-800 rounded-lg p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-6">
+                        <button id="prevMonth" class="bg-dnd-gold text-dnd-dark px-4 py-2 rounded hover:bg-yellow-500 transition">
+                            ← Previous
+                        </button>
+                        <h2 id="currentMonth" class="text-2xl font-semibold text-dnd-gold"></h2>
+                        <button id="nextMonth" class="bg-dnd-gold text-dnd-dark px-4 py-2 rounded hover:bg-yellow-500 transition">
+                            Next →
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-7 gap-2 mb-4">
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Sun</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Mon</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Tue</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Wed</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Thu</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Fri</div>
+                        <div class="text-center font-semibold p-2 text-dnd-gold">Sat</div>
+                    </div>
+                    
+                    <div id="calendarDays" class="grid grid-cols-7 gap-2"></div>
+                </div>
+            </div>
+
+            <!-- Session Management Section -->
+            <div class="lg:col-span-1">
+                <div class="bg-gray-800 rounded-lg p-6 shadow-xl mb-6">
+                    <h3 class="text-xl font-semibold text-dnd-gold mb-4">Add Session</h3>
+                    <form id="sessionForm" class="space-y-4">
+                        <input type="hidden" id="selectedDate">
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Date</label>
+                            <input type="date" id="sessionDate" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Session Name</label>
+                            <input type="text" id="sessionName" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white" placeholder="Session #1">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium mb-1">Notes</label>
+                            <textarea id="sessionNotes" class="w-full p-2 bg-gray-700 border border-gray-600 rounded text-white h-20" placeholder="What happened..."></textarea>
+                        </div>
+                        <button type="submit" class="w-full bg-dnd-gold text-dnd-dark py-2 rounded hover:bg-yellow-500 transition font-semibold">
+                            Add Session
+                        </button>
+                    </form>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg p-6 shadow-xl">
+                    <h3 class="text-xl font-semibold text-dnd-gold mb-4">Upcoming Sessions</h3>
+                    <div id="upcomingSessions" class="space-y-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Session Details Modal -->
+        <div id="sessionModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-semibold text-dnd-gold">Session Details</h3>
+                    <button id="closeModal" class="text-gray-400 hover:text-white text-xl">×</button>
+                </div>
+                <div id="modalContent"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

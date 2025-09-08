@@ -1,0 +1,25 @@
+# general
+.DS_Store
+.vscode/
+.idea/
+*.log
+
+# node / frontend
+node_modules/
+dist/
+build/
+npm-debug.log
+yarn.lock
+package-lock.json
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# backend-specific
+backend/node_modules/
+backend/.env
+
+# OS
+Thumbs.db
