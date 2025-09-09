@@ -1,0 +1,266 @@
+.time-travel-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.time-travel-modal {
+  background: var(--bg-color);
+  border-radius: 12px;
+  padding: 0;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-color);
+}
+
+.time-travel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--header-bg);
+  border-radius: 12px 12px 0 0;
+}
+
+.time-travel-header h3 {
+  margin: 0;
+  color: var(--text-color);
+  font-size: 1.5rem;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--text-color);
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--hover-color);
+}
+
+.time-travel-content {
+  padding: 20px;
+}
+
+.current-date-info {
+  text-align: center;
+  margin-bottom: 24px;
+  padding: 12px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.current-date-info p {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.quick-jumps {
+  margin-bottom: 32px;
+}
+
+.quick-jumps h4 {
+  margin: 0 0 16px 0;
+  color: var(--text-color);
+  font-size: 1.1rem;
+}
+
+.quick-jump-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.quick-jump-buttons button {
+  background: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.quick-jump-buttons button:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.custom-date-selector h4 {
+  margin: 0 0 16px 0;
+  color: var(--text-color);
+  font-size: 1.1rem;
+}
+
+.date-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-group label {
+  color: var(--text-color);
+  font-size: 0.9rem;
+  font-weight: bold;
+}
+
+.input-group input,
+.input-group select {
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text-color);
+  font-size: 1rem;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  outline: none;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 2px rgba(106, 90, 205, 0.2);
+}
+
+.selected-date-preview {
+  text-align: center;
+  padding: 12px;
+  background: var(--accent-bg);
+  border-radius: 6px;
+  margin-bottom: 24px;
+}
+
+.selected-date-preview p {
+  margin: 0;
+  color: var(--text-color);
+}
+
+.time-travel-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn,
+.jump-btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.cancel-btn {
+  background: var(--secondary-color);
+  color: var(--text-color);
+}
+
+.cancel-btn:hover {
+  background: var(--secondary-hover);
+}
+
+.jump-btn {
+  background: var(--success-color);
+  color: white;
+  font-weight: bold;
+}
+
+.jump-btn:hover {
+  background: var(--success-hover);
+  transform: translateY(-1px);
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .time-travel-modal {
+  --bg-color: #2a2a2a;
+  --header-bg: #333;
+  --card-bg: #333;
+  --accent-bg: #3a3a3a;
+  --text-color: #e0e0e0;
+  --border-color: #444;
+  --input-bg: #333;
+  --hover-color: #444;
+  --primary-color: #6a5acd;
+  --primary-hover: #5a4abd;
+  --secondary-color: #666;
+  --secondary-hover: #777;
+  --success-color: #4caf50;
+  --success-hover: #45a049;
+}
+
+/* Light mode */
+[data-theme="light"] .time-travel-modal {
+  --bg-color: #ffffff;
+  --header-bg: #f8f9fa;
+  --card-bg: #f8f9fa;
+  --accent-bg: #e9ecef;
+  --text-color: #333333;
+  --border-color: #dee2e6;
+  --input-bg: #ffffff;
+  --hover-color: #f8f9fa;
+  --primary-color: #6a5acd;
+  --primary-hover: #5a4abd;
+  --secondary-color: #6c757d;
+  --secondary-hover: #545b62;
+  --success-color: #28a745;
+  --success-hover: #218838;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+  .time-travel-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .quick-jump-buttons {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+  
+  .date-inputs {
+    grid-template-columns: 1fr;
+  }
+  
+  .time-travel-actions {
+    flex-direction: column;
+  }
+  
+  .time-travel-header {
+    padding: 16px;
+  }
+  
+  .time-travel-content {
+    padding: 16px;
+  }
+}

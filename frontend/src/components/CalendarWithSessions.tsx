@@ -11,6 +11,8 @@ import DarkModeToggle from './DarkModeToggle';
 import LanguageSelector from './LanguageSelector';
 import DayModal from './DayModal';
 import CategoryManager from './CategoryManager';
+import SearchModal from './SearchModal';
+import TimeTravelModal from './TimeTravelModal';
 import { API } from '../utils/api';
 import './Calendar.css';
 
@@ -24,8 +26,16 @@ const CalendarWithSessions: React.FC = () => {
   const [currentYear, setCurrentYear] = useState(1048);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [showTimeTravelModal, setShowTimeTravelModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
   const [draggedGroup, setDraggedGroup] = useState<PartyGroup | null>(null);
+  const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
+  const [dragOverDay, setDragOverDay] = useState<number | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupColor, setNewGroupColor] = useState('#ff6b6b');
 
@@ -80,13 +90,42 @@ const CalendarWithSessions: React.FC = () => {
       .catch(console.error);
   }, [currentSession]);
 
-  // Set initial year when config is first loaded
+  // Find and set the current month based on the last completed day
+  const findCurrentMonth = React.useCallback(async () => {
+    if (!currentSession) return;
+    
+    try {
+      const response = await API.completed.getAll(currentSession);
+      const completedDays: CompletedDay[] = await response.json();
+      
+      if (completedDays.length === 0) {
+        // No completed days, stay at default (config.year, month 0)
+        return;
+      }
+      
+      // Find the latest completed day (they're already sorted by year, month, day ASC)
+      const lastCompletedDay = completedDays[completedDays.length - 1];
+      
+      console.log('🗓️ Found last completed day:', lastCompletedDay);
+      
+      // Set the current month to the month of the last completed day
+      setCurrentYear(lastCompletedDay.year);
+      setCurrentMonth(lastCompletedDay.month);
+      
+    } catch (error) {
+      console.error('Error fetching completed days for current month detection:', error);
+      // Fall back to default behavior if there's an error
+    }
+  }, [currentSession]);
+
+  // Set initial year when config is first loaded and find current month based on completed days
   useEffect(() => {
-    if (config && !initialYearSet.current) {
+    if (config && currentSession && !initialYearSet.current) {
       setCurrentYear(config.year);
+      findCurrentMonth();
       initialYearSet.current = true;
     }
-  }, [config]);
+  }, [config, currentSession, findCurrentMonth]);
 
   // Fetch data when month, year, or session changes
   useEffect(() => {
@@ -123,6 +162,13 @@ const CalendarWithSessions: React.FC = () => {
       onEvent('day-completed', (data: any) => {
         console.log('Day completed:', data);
         fetchCompletedDays(); // Refresh completed days
+        
+        // Auto-navigate to the month of the newly completed day if it's newer than current
+        if (data.year > currentYear || (data.year === currentYear && data.month > currentMonth)) {
+          console.log('🗓️ Auto-navigating to newly completed month:', data.year, data.month);
+          setCurrentYear(data.year);
+          setCurrentMonth(data.month);
+        }
       }),
 
       onEvent('day-uncompleted', (data: any) => {
@@ -163,6 +209,16 @@ const CalendarWithSessions: React.FC = () => {
       onEvent('category-deleted', (data: any) => {
         console.log('Category deleted:', data);
         fetchCategories(); // Refresh categories
+      }),
+
+      onEvent('event-moved', (data: any) => {
+        console.log('Event moved:', data);
+        fetchEvents(); // Refresh events for current month
+        // Also refresh events for the old month if different
+        if (data.oldDate.year !== currentYear || data.oldDate.month !== currentMonth) {
+          // Event was moved from a different month, we might need to refresh that too
+          // For now, just refresh current month
+        }
       })
     ];
 
@@ -319,7 +375,17 @@ const CalendarWithSessions: React.FC = () => {
 
   const handleDragStart = (e: React.DragEvent, group: PartyGroup) => {
     setDraggedGroup(group);
+    setDraggedEvent(null); // Clear any dragged event
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', `party-${group.id}`);
+  };
+
+  const handleEventDragStart = (e: React.DragEvent, event: CalendarEvent) => {
+    setDraggedEvent(event);
+    setDraggedGroup(null); // Clear any dragged group
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', `event-${event.id}`);
+    e.stopPropagation(); // Prevent day click when dragging event
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -327,10 +393,28 @@ const CalendarWithSessions: React.FC = () => {
     e.dataTransfer.dropEffect = 'move';
   };
 
+  const handleDragEnter = (e: React.DragEvent, day: number) => {
+    e.preventDefault();
+    if (day > 0) {
+      setDragOverDay(day);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Only clear if we're actually leaving the day (not moving to a child element)
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverDay(null);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent, day: number) => {
     e.preventDefault();
     
-    if (draggedGroup && day > 0 && currentSession) {
+    if (day <= 0 || !currentSession) return;
+
+    // Handle party group drop
+    if (draggedGroup) {
       API.groups.updatePosition(draggedGroup.id, {
         sessionId: currentSession,
         year: currentYear,
@@ -338,13 +422,35 @@ const CalendarWithSessions: React.FC = () => {
         day: day
       })
       .then(() => {
-        // Don't manually refresh - WebSocket will handle it
         console.log('Party position updated via WebSocket');
       })
       .catch(console.error);
     }
     
+    // Handle event drop
+    if (draggedEvent) {
+      // Don't drop on the same day
+      if (draggedEvent.year === currentYear && 
+          draggedEvent.month === currentMonth && 
+          draggedEvent.day === day) {
+        setDraggedEvent(null);
+        return;
+      }
+
+      API.events.move(draggedEvent.id, currentSession, currentYear, currentMonth, day)
+        .then(() => {
+          console.log('Event moved via WebSocket');
+        })
+        .catch((error) => {
+          console.error('Failed to move event:', error);
+          alert('Failed to move event. Please try again.');
+        });
+    }
+    
+    // Clear dragged items and drag-over state
     setDraggedGroup(null);
+    setDraggedEvent(null);
+    setDragOverDay(null);
   };
 
   const getMoonPhasesForDay = (day: number): MoonPhase[] => {
@@ -374,6 +480,65 @@ const CalendarWithSessions: React.FC = () => {
     return Array.isArray(completedDays) ? completedDays.some(cd => cd.day === day) : false;
   };
 
+  const handleNavigateToDate = (year: number, month: number, day?: number) => {
+    setCurrentYear(year);
+    setCurrentMonth(month);
+    if (day) {
+      setSelectedDay(day);
+      setShowDayModal(true);
+    }
+    setShowSearchResults(false);
+    initialYearSet.current = true; // Mark as manually changed
+  };
+
+  const performSearch = React.useCallback(async (query: string) => {
+    if (!currentSession || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await API.search.query(currentSession, query.trim());
+      if (response.ok) {
+        const data = await response.json();
+        setSearchResults(data.results);
+        setShowSearchResults(data.results.length > 0);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      setSearchResults([]);
+      setShowSearchResults(false);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [currentSession]);
+
+  React.useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim()) {
+        performSearch(searchQuery);
+      } else {
+        setSearchResults([]);
+        setShowSearchResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, performSearch]);
+
+  const handleSearchResultClick = (result: any) => {
+    handleNavigateToDate(result.year, result.month, result.day);
+    setSearchQuery('');
+    setShowSearchResults(false);
+  };
+
+  const formatSearchDate = (year: number, month: number, day: number) => {
+    const monthName = config?.months[month];
+    return `${day}. ${monthName} ${year}`;
+  };
+
   if (!currentSession) {
     return <SessionManager onSessionSelect={onSessionSelect} />;
   }
@@ -391,6 +556,40 @@ const CalendarWithSessions: React.FC = () => {
           <small>Session: {currentSession}</small>
           <button onClick={() => setCurrentSession(null)}>Change Session</button>
           <LanguageSelector />
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="🔍 Search events & notes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-field"
+            />
+            {isSearching && <div className="search-loading-indicator">⏳</div>}
+            {showSearchResults && (
+              <div className="search-dropdown">
+                {searchResults.slice(0, 5).map((result) => (
+                  <div
+                    key={result.id}
+                    className={`search-result-item ${result.type}`}
+                    onClick={() => handleSearchResultClick(result)}
+                  >
+                    <div className="search-result-icon">
+                      {result.type === 'note' ? '📝' : '📅'}
+                    </div>
+                    <div className="search-result-content">
+                      <div className="search-result-title">{result.title}</div>
+                      <div className="search-result-date">{formatSearchDate(result.year, result.month, result.day)}</div>
+                    </div>
+                  </div>
+                ))}
+                {searchResults.length > 5 && (
+                  <div className="search-more-results" onClick={() => setShowSearchModal(true)}>
+                    +{searchResults.length - 5} more results...
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
         <h1>🌙 Aetherial Calender ✨</h1>
         <div className="calendar-nav">
@@ -407,7 +606,16 @@ const CalendarWithSessions: React.FC = () => {
           >
             ← Previous
           </button>
-          <h2>{monthName} {currentYear}</h2>
+          <div className="nav-center">
+            <h2>{monthName} {currentYear}</h2>
+            <button 
+              className="time-travel-btn"
+              onClick={() => setShowTimeTravelModal(true)}
+              title="Time Travel - Jump to any date"
+            >
+              🕰️
+            </button>
+          </div>
           <button 
             onClick={() => {
               if (currentMonth === 11) {
@@ -459,11 +667,14 @@ const CalendarWithSessions: React.FC = () => {
               const moonPhases = day > 0 ? getMoonPhasesForDay(day) : [];
               const partyGroupsHere = day > 0 ? getPartyGroupsForDay(day) : [];
               const isCompleted = day > 0 ? isDayCompleted(day) : false;
+              const isDragOver = dragOverDay === day;
+              const isDraggingSameDay = draggedEvent && draggedEvent.year === currentYear && 
+                                        draggedEvent.month === currentMonth && draggedEvent.day === day;
               
               return (
                 <div
                   key={dayIndex}
-                  className={`calendar-day ${day === 0 ? 'empty' : ''} ${selectedDay === day ? 'selected' : ''} ${isCompleted ? 'completed' : ''}`}
+                  className={`calendar-day ${day === 0 ? 'empty' : ''} ${selectedDay === day ? 'selected' : ''} ${isCompleted ? 'completed' : ''} ${isDragOver ? 'drag-over' : ''} ${isDraggingSameDay ? 'invalid-drop' : ''}`}
                   onClick={() => {
                     if (day > 0) {
                       setSelectedDay(day);
@@ -471,6 +682,8 @@ const CalendarWithSessions: React.FC = () => {
                     }
                   }}
                   onDragOver={handleDragOver}
+                  onDragEnter={(e) => handleDragEnter(e, day)}
+                  onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, day)}
                 >
                   {day > 0 && (
@@ -503,15 +716,18 @@ const CalendarWithSessions: React.FC = () => {
                         <div className="events">
                           {dayEvents.map(event => {
                             const category = categories.find(c => c.id === event.category_id);
+                            const isDraggedEvent = draggedEvent?.id === event.id;
                             return (
                               <div 
                                 key={event.id} 
-                                className={`event ${event.title.startsWith('📝') ? 'note' : ''} ${category ? 'has-category' : ''}`}
+                                className={`event ${event.title.startsWith('📝') ? 'note' : ''} ${category ? 'has-category' : ''} ${isDraggedEvent ? 'dragging' : ''}`}
                                 style={category ? { 
                                   borderLeft: `3px solid ${category.color}`,
                                   backgroundColor: `${category.color}10`
                                 } : {}}
                                 title={`${event.title}${event.description ? '\n' + event.description : ''}${category ? '\n🏷️ ' + category.name : ''}`}
+                                draggable
+                                onDragStart={(e) => handleEventDragStart(e, event)}
                               >
                                 {category && <span className="event-category-emoji">{category.emoji}</span>}
                                 {event.title}
@@ -520,14 +736,20 @@ const CalendarWithSessions: React.FC = () => {
                           })}
                         </div>
                       )}
-                      {partyGroupsHere.map(group => (
-                        <PartyMarker
-                          key={group.id}
-                          group={group}
-                          onDragStart={handleDragStart}
-                          onDelete={deletePartyGroup}
-                        />
-                      ))}
+                      {partyGroupsHere.length > 0 && (
+                        <div className="party-groups-container">
+                          {partyGroupsHere.map((group, index) => (
+                            <PartyMarker
+                              key={group.id}
+                              group={group}
+                              index={index}
+                              total={partyGroupsHere.length}
+                              onDragStart={handleDragStart}
+                              onDelete={deletePartyGroup}
+                            />
+                          ))}
+                        </div>
+                      )}
                       <div className="moon-phases">
                         {moonPhases.map((moon, idx) => {
                           const phasePercent = (moon.phase / moon.cycle) * 100;
@@ -565,6 +787,26 @@ const CalendarWithSessions: React.FC = () => {
           onAddNote={handleAddNote}
           onDeleteEvent={deleteEvent}
           onConfirmEvent={confirmEvent}
+        />
+      )}
+
+      {showSearchModal && (
+        <SearchModal
+          currentSession={currentSession}
+          config={config}
+          onClose={() => setShowSearchModal(false)}
+          onNavigateToDate={handleNavigateToDate}
+        />
+      )}
+
+      {showTimeTravelModal && (
+        <TimeTravelModal
+          isOpen={showTimeTravelModal}
+          onClose={() => setShowTimeTravelModal(false)}
+          config={config}
+          currentYear={currentYear}
+          currentMonth={currentMonth}
+          onNavigateToDate={handleNavigateToDate}
         />
       )}
     </div>

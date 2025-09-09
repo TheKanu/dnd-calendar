@@ -51,6 +51,11 @@ export const API = {
       authFetch(`${apiConfig.API_BASE_URL}/api/events/${eventId}/confirm`, {
         method: 'PUT',
         body: JSON.stringify({ sessionId, confirmed })
+      }),
+    move: (eventId: number, sessionId: string, year: number, month: number, day: number) =>
+      authFetch(`${apiConfig.API_BASE_URL}/api/events/${eventId}/move`, {
+        method: 'PUT',
+        body: JSON.stringify({ sessionId, year, month, day })
       })
   },
   sessions: {
@@ -96,6 +101,8 @@ export const API = {
   completed: {
     getForMonth: (sessionId: string, year: number, month: number) => 
       authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/completed/${year}/${month}`),
+    getAll: (sessionId: string) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/completed`),
     markDay: (sessionId: string, dayData: any) => 
       authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/completed`, {
         method: 'POST',
@@ -105,5 +112,13 @@ export const API = {
       authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/completed/${year}/${month}/${day}`, {
         method: 'DELETE'
       })
+  },
+  search: {
+    query: (sessionId: string, query: string, filters?: { year?: number; month?: number }) => {
+      const params = new URLSearchParams({ q: query });
+      if (filters?.year) params.append('year', filters.year.toString());
+      if (filters?.month) params.append('month', filters.month.toString());
+      return authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/search?${params}`);
+    }
   }
 };

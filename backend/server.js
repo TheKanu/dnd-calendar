@@ -572,6 +572,70 @@ app.delete('/api/events/:eventId', authenticateToken, async (req, res) => {
   }
 });
 
+// Move Event API - Update event date
+app.put('/api/events/:eventId/move', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { sessionId, year, month, day } = req.body;
+    
+    if (!sessionId || year === undefined || month === undefined || day === undefined) {
+      return res.status(400).json({ error: 'Session ID, year, month, and day are required' });
+    }
+
+    // First get the current event to verify it exists and belongs to the session
+    const getCurrentEvent = () => {
+      return new Promise((resolve, reject) => {
+        db.get('SELECT * FROM events WHERE id = ? AND session_id = ?', [eventId, sessionId], (err, row) => {
+          if (err) reject(err);
+          else resolve(row);
+        });
+      });
+    };
+
+    const currentEvent = await getCurrentEvent();
+    if (!currentEvent) {
+      return res.status(404).json({ error: 'Event not found or does not belong to this session' });
+    }
+
+    // Update the event's date
+    const updateEvent = () => {
+      return new Promise((resolve, reject) => {
+        db.run(
+          'UPDATE events SET year = ?, month = ?, day = ? WHERE id = ? AND session_id = ?',
+          [year, month, day, eventId, sessionId],
+          function(err) {
+            if (err) reject(err);
+            else resolve({ changes: this.changes });
+          }
+        );
+      });
+    };
+
+    const result = await updateEvent();
+    
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+
+    // Get the updated event
+    const updatedEvent = await getCurrentEvent();
+    
+    // Broadcast to all clients in the session
+    io.to(sessionId).emit('event-moved', {
+      eventId: parseInt(eventId),
+      event: updatedEvent,
+      oldDate: { year: currentEvent.year, month: currentEvent.month, day: currentEvent.day },
+      newDate: { year, month, day },
+      timestamp: new Date()
+    });
+    
+    res.json({ success: true, event: updatedEvent });
+  } catch (err) {
+    console.error('Move event error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Event Confirmation API
 app.put('/api/events/:eventId/confirm', authenticateToken, async (req, res) => {
   try {
@@ -600,6 +664,17 @@ app.get('/api/sessions/:sessionId/completed/:year/:month', authenticateToken, as
   try {
     const { sessionId, year, month } = req.params;
     const completedDays = await sessionManager.getCompletedDays(sessionId, parseInt(year), parseInt(month));
+    res.json(completedDays);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get all completed days for a session (for finding current month)
+app.get('/api/sessions/:sessionId/completed', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const completedDays = await sessionManager.getAllCompletedDays(sessionId);
     res.json(completedDays);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -643,6 +718,80 @@ app.delete('/api/sessions/:sessionId/completed/:year/:month/:day', authenticateT
     
     res.json(result);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Search API - Search events and notes by keyword
+app.get('/api/sessions/:sessionId/search', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { q: query, year, month } = req.query;
+    
+    if (!query || query.trim().length < 2) {
+      return res.status(400).json({ error: 'Search query must be at least 2 characters long' });
+    }
+
+    const searchQuery = `%${query.trim().toLowerCase()}%`;
+    let sql = `
+      SELECT e.*, c.name as category_name, c.color as category_color, c.emoji as category_emoji
+      FROM events e
+      LEFT JOIN categories c ON e.category_id = c.id
+      WHERE e.session_id = ? AND (
+        LOWER(e.title) LIKE ? OR 
+        LOWER(e.description) LIKE ?
+      )
+    `;
+    const params = [sessionId, searchQuery, searchQuery];
+
+    // Add optional year/month filters
+    if (year && !isNaN(parseInt(year))) {
+      sql += ' AND e.year = ?';
+      params.push(parseInt(year));
+    }
+    
+    if (month && !isNaN(parseInt(month))) {
+      sql += ' AND e.month = ?';
+      params.push(parseInt(month));
+    }
+
+    sql += ' ORDER BY e.year DESC, e.month DESC, e.day DESC, e.created_at DESC';
+
+    db.all(sql, params, (err, rows) => {
+      if (err) {
+        console.error('Search error:', err);
+        res.status(500).json({ error: err.message });
+        return;
+      }
+
+      const results = rows.map(row => ({
+        id: row.id,
+        session_id: row.session_id,
+        year: row.year,
+        month: row.month,
+        day: row.day,
+        title: row.title,
+        description: row.description,
+        confirmed: row.confirmed,
+        is_recurring: row.is_recurring,
+        category_id: row.category_id,
+        category: row.category_name ? {
+          name: row.category_name,
+          color: row.category_color,
+          emoji: row.category_emoji
+        } : null,
+        created_at: row.created_at,
+        type: row.title.startsWith('📝') ? 'note' : 'event'
+      }));
+
+      res.json({
+        query: query.trim(),
+        total: results.length,
+        results
+      });
+    });
+  } catch (err) {
+    console.error('Search error:', err);
     res.status(500).json({ error: err.message });
   }
 });

@@ -4,11 +4,13 @@ import './PartyMarker.css';
 
 interface PartyMarkerProps {
   group: PartyGroup;
+  index?: number;
+  total?: number;
   onDragStart: (e: React.DragEvent, group: PartyGroup) => void;
   onDelete?: (groupId: number) => void;
 }
 
-const PartyMarker: React.FC<PartyMarkerProps> = ({ group, onDragStart, onDelete }) => {
+const PartyMarker: React.FC<PartyMarkerProps> = ({ group, index = 0, total = 1, onDragStart, onDelete }) => {
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();

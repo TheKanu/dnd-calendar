@@ -159,6 +159,19 @@ class SessionManager {
     });
   }
 
+  getAllCompletedDays(sessionId) {
+    return new Promise((resolve, reject) => {
+      this.db.all(
+        'SELECT * FROM completed_days WHERE session_id = ? ORDER BY year ASC, month ASC, day ASC',
+        [sessionId],
+        (err, rows) => {
+          if (err) reject(err);
+          else resolve(rows);
+        }
+      );
+    });
+  }
+
   deletePartyGroup(groupId) {
     return new Promise((resolve, reject) => {
       this.db.run(
