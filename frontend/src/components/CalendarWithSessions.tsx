@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CalendarConfig, CalendarEvent, MoonPhase } from '../types/Calendar';
 import { PartyGroup } from '../types/Session';
 import { CompletedDay } from '../types/CompletedDay';
@@ -31,6 +31,7 @@ const CalendarWithSessions: React.FC = () => {
 
   const { onEvent } = useSocket(currentSession);
   const { getWeekdays, isTransitioning } = useLanguage();
+  const initialYearSet = useRef(false);
 
   useEffect(() => {
     API.calendar.getConfig()
@@ -79,9 +80,17 @@ const CalendarWithSessions: React.FC = () => {
       .catch(console.error);
   }, [currentSession]);
 
+  // Set initial year when config is first loaded
+  useEffect(() => {
+    if (config && !initialYearSet.current) {
+      setCurrentYear(config.year);
+      initialYearSet.current = true;
+    }
+  }, [config]);
+
+  // Fetch data when month, year, or session changes
   useEffect(() => {
     if (config && currentSession) {
-      setCurrentYear(config.year);
       fetchEvents();
       fetchPartyGroups();
       fetchCompletedDays();
@@ -184,12 +193,15 @@ const CalendarWithSessions: React.FC = () => {
     // Session exists, proceed to join it
     setCurrentSession(sessionId);
     
-    // Try to get session info to set start date
+    // Try to get session info to set start date (only if year hasn't been manually set)
     try {
       const response = await API.sessions.get(sessionId);
       if (response.ok) {
         const session = await response.json();
-        if (session.start_year) setCurrentYear(session.start_year);
+        if (session.start_year && !initialYearSet.current) {
+          setCurrentYear(session.start_year);
+          initialYearSet.current = true;
+        }
         if (session.start_month !== undefined) setCurrentMonth(session.start_month);
       }
     } catch (error) {
@@ -387,6 +399,7 @@ const CalendarWithSessions: React.FC = () => {
               if (currentMonth === 0) {
                 setCurrentMonth(11);
                 setCurrentYear(prev => prev - 1);
+                initialYearSet.current = true; // Mark as manually changed
               } else {
                 setCurrentMonth(prev => prev - 1);
               }
@@ -400,6 +413,7 @@ const CalendarWithSessions: React.FC = () => {
               if (currentMonth === 11) {
                 setCurrentMonth(0);
                 setCurrentYear(prev => prev + 1);
+                initialYearSet.current = true; // Mark as manually changed
               } else {
                 setCurrentMonth(prev => prev + 1);
               }
