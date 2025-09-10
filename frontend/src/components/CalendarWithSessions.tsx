@@ -92,14 +92,18 @@ const CalendarWithSessions: React.FC = () => {
 
   // Find and set the current month based on the last completed day
   const findCurrentMonth = React.useCallback(async () => {
+    console.log('🔍 findCurrentMonth called for session:', currentSession);
     if (!currentSession) return;
     
     try {
+      console.log('📡 Fetching all completed days...');
       const response = await API.completed.getAll(currentSession);
       const completedDays: CompletedDay[] = await response.json();
       
+      console.log('✅ Received completed days:', completedDays);
+      
       if (completedDays.length === 0) {
-        // No completed days, stay at default (config.year, month 0)
+        console.log('⚠️ No completed days found, staying at default');
         return;
       }
       
@@ -107,13 +111,16 @@ const CalendarWithSessions: React.FC = () => {
       const lastCompletedDay = completedDays[completedDays.length - 1];
       
       console.log('🗓️ Found last completed day:', lastCompletedDay);
+      console.log('🧭 Navigating to year:', lastCompletedDay.year, 'month:', lastCompletedDay.month);
       
       // Set the current month to the month of the last completed day
       setCurrentYear(lastCompletedDay.year);
       setCurrentMonth(lastCompletedDay.month);
       
+      console.log('✨ Auto-navigation completed!');
+      
     } catch (error) {
-      console.error('Error fetching completed days for current month detection:', error);
+      console.error('💥 Error fetching completed days for current month detection:', error);
       // Fall back to default behavior if there's an error
     }
   }, [currentSession]);

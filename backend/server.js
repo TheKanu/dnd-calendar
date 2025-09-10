@@ -837,9 +837,22 @@ app.delete('/api/sessions/:sessionId', async (req, res) => {
 // In-memory storage for user roles (per socket connection)
 const userRoles = new Map(); // socketId -> { sessionId, role, username }
 
-// Socket.io connection handling
+// Socket.io connection handling with error protection
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+
+  // Add error handling for socket
+  socket.on('error', (error) => {
+    console.error('🔌 Socket error for', socket.id, ':', error);
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('🔌 Socket connect error for', socket.id, ':', error);
+  });
+
+  socket.on('disconnect', (reason) => {
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
+  });
 
   // Join session room with role (backward compatible)
   socket.on('join-session', (data) => {
@@ -919,18 +932,22 @@ io.on('connection', (socket) => {
     socket.emit('session-users', sessionUsers);
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
     const userInfo = userRoles.get(socket.id);
     if (userInfo) {
-      socket.to(userInfo.sessionId).emit('user-left', {
-        socketId: socket.id,
-        username: userInfo.username,
-        role: userInfo.role,
-        timestamp: new Date()
-      });
-      userRoles.delete(socket.id);
+      try {
+        socket.to(userInfo.sessionId).emit('user-left', {
+          socketId: socket.id,
+          username: userInfo.username,
+          role: userInfo.role,
+          timestamp: new Date()
+        });
+        userRoles.delete(socket.id);
+      } catch (error) {
+        console.error('🔌 Error during disconnect cleanup:', error);
+      }
     }
-    console.log('User disconnected:', socket.id);
+    console.log('User disconnected:', socket.id, 'Reason:', reason);
   });
 });
 
@@ -951,6 +968,19 @@ if (process.env.NODE_ENV === 'production') {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
   });
 }
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('💥 Uncaught Exception:', error);
+  console.error('Stack:', error.stack);
+  // Don't exit - keep server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
+  console.error('Stack:', reason?.stack);
+  // Don't exit - keep server running
+});
 
 server.listen(PORT, () => {
   console.log(`🌙 Aetherial Calender running on port ${PORT}`);

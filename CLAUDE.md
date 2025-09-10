@@ -6,8 +6,10 @@
 - Port 3000 ist für cat.catto.at reserviert
 
 ## Commands
-- Backend starten: `cd backend && PORT=3002 npm start`
+- Backend starten: `./backend/start-server.sh` (mit PM2 Auto-Restart) oder `cd backend && PORT=3002 npm start`
 - Frontend starten: `cd frontend && PORT=3002 npm start`
+- Server Status: `pm2 status`
+- Server Logs: `pm2 logs dnd-calendar-backend`
 
 ## Sprachen
 Aktuell verfügbare Fantasy-Sprachen:
