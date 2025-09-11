@@ -15,20 +15,38 @@ interface Category {
   emoji: string;
 }
 
+interface ArtifactOptions {
+  artifactName: string;
+  chargeType: 'lumenis' | 'umbrath' | 'manith' | 'custom';
+  customCycle?: number;
+  description?: string;
+}
+
+interface CountdownOptions {
+  eventName: string;
+  targetDate: { year: number; month: number; day: number };
+  description?: string;
+  importance: 'low' | 'medium' | 'high' | 'critical';
+}
+
 interface DayModalProps {
   day: number;
   existingEvents: Array<{id: number; title: string; description?: string; confirmed?: boolean; is_recurring?: boolean; category_id?: number; recurring_parent_id?: number}>;
   onClose: () => void;
   onAddEvent: (title: string, description: string, recurringOptions?: RecurringEventOptions, categoryId?: number) => void;
   onAddNote: (content: string) => void;
+  onAddArtifact?: (artifactOptions: ArtifactOptions) => void;
+  onAddCountdown?: (countdownOptions: CountdownOptions) => void;
   onDeleteEvent?: (eventId: number, deleteSeries?: boolean) => void;
   onConfirmEvent?: (eventId: number, confirmed: boolean) => void;
   categories?: Category[];
   currentRole?: 'DM' | 'Player';
+  currentYear?: number;
+  currentMonth?: number;
 }
 
-const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAddEvent, onAddNote, onDeleteEvent, onConfirmEvent, categories = [], currentRole = 'Player' }) => {
-  const [selectedType, setSelectedType] = useState<'event' | 'note' | null>(null);
+const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAddEvent, onAddNote, onAddArtifact, onAddCountdown, onDeleteEvent, onConfirmEvent, categories = [], currentRole = 'Player', currentYear = 1048, currentMonth = 0 }) => {
+  const [selectedType, setSelectedType] = useState<'event' | 'note' | 'artifact' | 'countdown' | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [noteContent, setNoteContent] = useState('');
@@ -41,6 +59,20 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
   
   // Category state
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
+
+  // Artifact states
+  const [artifactName, setArtifactName] = useState('');
+  const [chargeType, setChargeType] = useState<'lumenis' | 'umbrath' | 'manith' | 'custom'>('lumenis');
+  const [customCycle, setCustomCycle] = useState(7);
+  const [artifactDescription, setArtifactDescription] = useState('');
+
+  // Countdown states
+  const [countdownEventName, setCountdownEventName] = useState('');
+  const [targetYear, setTargetYear] = useState(currentYear);
+  const [targetMonth, setTargetMonth] = useState(currentMonth);
+  const [targetDay, setTargetDay] = useState(1);
+  const [countdownDescription, setCountdownDescription] = useState('');
+  const [importance, setImportance] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
 
   // Deletion modal state
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -59,6 +91,24 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
     } else if (selectedType === 'note' && noteContent.trim()) {
       onAddNote(noteContent);
       onClose();
+    } else if (selectedType === 'artifact' && artifactName.trim() && onAddArtifact) {
+      const artifactOptions: ArtifactOptions = {
+        artifactName,
+        chargeType,
+        customCycle: chargeType === 'custom' ? customCycle : undefined,
+        description: artifactDescription
+      };
+      onAddArtifact(artifactOptions);
+      onClose();
+    } else if (selectedType === 'countdown' && countdownEventName.trim() && onAddCountdown) {
+      const countdownOptions: CountdownOptions = {
+        eventName: countdownEventName,
+        targetDate: { year: targetYear, month: targetMonth, day: targetDay },
+        description: countdownDescription,
+        importance
+      };
+      onAddCountdown(countdownOptions);
+      onClose();
     }
   };
 
@@ -71,11 +121,30 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
     setRecurringInterval(1);
     setRecurringEndDate('');
     setSelectedCategoryId(undefined);
+    setArtifactName('');
+    setChargeType('lumenis');
+    setCustomCycle(7);
+    setArtifactDescription('');
+    setCountdownEventName('');
+    setTargetYear(currentYear);
+    setTargetMonth(currentMonth);
+    setTargetDay(1);
+    setCountdownDescription('');
+    setImportance('medium');
   };
 
-  const handleTypeSelect = (type: 'event' | 'note') => {
+  const handleTypeSelect = (type: 'event' | 'note' | 'artifact' | 'countdown') => {
     setSelectedType(type);
     resetForm();
+  };
+
+  const getCycleName = (type: 'lumenis' | 'umbrath' | 'manith' | 'custom') => {
+    switch (type) {
+      case 'lumenis': return 'Lumenis (12 Tage)';
+      case 'umbrath': return 'Umbrath (6 Tage)';
+      case 'manith': return 'Manith (48 Tage)';
+      case 'custom': return 'Benutzerdefiniert';
+    }
   };
 
   const existingNotes = existingEvents.filter(event => event.title.startsWith('📝'));
@@ -199,19 +268,28 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
               <h4>{existingEvents.length > 0 ? 'Neuen Eintrag hinzufügen' : 'Was möchtest du hinzufügen?'}</h4>
               {currentRole !== 'DM' && (
                 <div className="permission-notice">
-                  <p>⚔️ Als Spieler kannst du nur Notizen erstellen.</p>
+                  <p>⚔️ Als Spieler kannst du Notizen und Artefakte erstellen.</p>
                   <p>👑 Events können nur vom Dungeon Master erstellt werden.</p>
                 </div>
               )}
               <div className="type-buttons">
                 {currentRole === 'DM' && (
-                  <button 
-                    className="type-button event-button" 
-                    onClick={() => handleTypeSelect('event')}
-                  >
-                    📅 Event
-                    <small>Einmalige oder wiederkehrende Termine</small>
-                  </button>
+                  <>
+                    <button 
+                      className="type-button event-button" 
+                      onClick={() => handleTypeSelect('event')}
+                    >
+                      📅 Event
+                      <small>Einmalige oder wiederkehrende Termine</small>
+                    </button>
+                    <button 
+                      className="type-button countdown-button" 
+                      onClick={() => handleTypeSelect('countdown')}
+                    >
+                      ⏰ Countdown
+                      <small>Besondere Ereignisse mit Countdown</small>
+                    </button>
+                  </>
                 )}
                 <button 
                   className="type-button note-button" 
@@ -219,6 +297,13 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                 >
                   📝 Notiz
                   <small>Allgemeine Notizen und Beschreibungen</small>
+                </button>
+                <button 
+                  className="type-button artifact-button" 
+                  onClick={() => handleTypeSelect('artifact')}
+                >
+                  🔮 Artefakt
+                  <small>Magische Items mit Aufladungszyklen</small>
                 </button>
               </div>
             </div>
@@ -233,7 +318,10 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                 ← Zurück
               </button>
               <h4>
-                {selectedType === 'event' ? '📅 Event hinzufügen' : '📝 Notiz hinzufügen'}
+                {selectedType === 'event' ? '📅 Event hinzufügen' : 
+                 selectedType === 'note' ? '📝 Notiz hinzufügen' : 
+                 selectedType === 'artifact' ? '🔮 Artefakt hinzufügen' : 
+                 '⏰ Countdown hinzufügen'}
               </h4>
             </div>
             
@@ -351,7 +439,7 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                   </button>
                 </div>
               </div>
-            ) : (
+            ) : selectedType === 'note' ? (
               <div className="note-form">
                 <textarea
                   placeholder="Notiz schreiben..."
@@ -375,6 +463,169 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                     disabled={!noteContent.trim()}
                   >
                     Notiz speichern
+                  </button>
+                </div>
+              </div>
+            ) : selectedType === 'artifact' ? (
+              <div className="artifact-form">
+                <input
+                  type="text"
+                  placeholder="Artefakt Name (z.B. Stab der Macht)"
+                  value={artifactName}
+                  onChange={(e) => setArtifactName(e.target.value)}
+                  autoFocus
+                />
+                
+                <div className="charge-cycle-selection">
+                  <label>
+                    Aufladungszyklus:
+                    <select
+                      value={chargeType}
+                      onChange={(e) => setChargeType(e.target.value as 'lumenis' | 'umbrath' | 'manith' | 'custom')}
+                    >
+                      <option value="lumenis">🌕 Lumenis - Großer Weißer Mond (12 Tage)</option>
+                      <option value="umbrath">🌑 Umbrath - Schattenmond (6 Tage)</option>
+                      <option value="manith">🔮 Manith - Kleiner Arkaner Mond (48 Tage)</option>
+                      <option value="custom">⚙️ Benutzerdefiniert</option>
+                    </select>
+                  </label>
+                </div>
+
+                {chargeType === 'custom' && (
+                  <div className="custom-cycle">
+                    <label>
+                      Aufladung alle:
+                      <input
+                        type="number"
+                        min="1"
+                        max="365"
+                        value={customCycle}
+                        onChange={(e) => setCustomCycle(parseInt(e.target.value) || 1)}
+                      />
+                      Tage
+                    </label>
+                  </div>
+                )}
+
+                <textarea
+                  placeholder="Beschreibung des Artefakts (optional)"
+                  value={artifactDescription}
+                  onChange={(e) => setArtifactDescription(e.target.value)}
+                  rows={3}
+                />
+
+                <div className="cycle-info">
+                  <p><strong>ℹ️ Aufladungssystem:</strong></p>
+                  <p>Das Artefakt lädt sich automatisch alle {chargeType === 'custom' ? customCycle : 
+                    chargeType === 'lumenis' ? '12' : 
+                    chargeType === 'umbrath' ? '6' : '48'} Tage auf.</p>
+                  <p>Die nächsten Aufladungen werden automatisch im Kalender angezeigt.</p>
+                </div>
+                
+                {/* Artifact Form Actions */}
+                <div className="form-actions">
+                  <button 
+                    className="cancel-button" 
+                    onClick={onClose}
+                  >
+                    Abbrechen
+                  </button>
+                  <button 
+                    className="submit-button" 
+                    onClick={handleSubmit}
+                    disabled={!artifactName.trim()}
+                  >
+                    Artefakt erstellen
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="countdown-form">
+                <input
+                  type="text"
+                  placeholder="Event Name (z.B. Schlacht um Drachenfels)"
+                  value={countdownEventName}
+                  onChange={(e) => setCountdownEventName(e.target.value)}
+                  autoFocus
+                />
+
+                <div className="target-date-selection">
+                  <label>
+                    Zieldatum:
+                    <div className="date-inputs">
+                      <input
+                        type="number"
+                        placeholder="Jahr"
+                        min={currentYear}
+                        max={currentYear + 10}
+                        value={targetYear}
+                        onChange={(e) => setTargetYear(parseInt(e.target.value) || currentYear)}
+                      />
+                      <select
+                        value={targetMonth}
+                        onChange={(e) => setTargetMonth(parseInt(e.target.value))}
+                      >
+                        {Array.from({length: 12}, (_, i) => (
+                          <option key={i} value={i}>
+                            {['Auro\'ithil', 'Man\'alasse', 'Thael\'orne', 'Pel\'anor', 'Drac\'uial', 'Val\'kaurn', 'Shad\'morn', 'Ley\'thurin', 'Nex\'illien', 'Tun\'giliath', 'Mor\'galad', 'Cir\'annen'][i]}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        placeholder="Tag"
+                        min={1}
+                        max={44}
+                        value={targetDay}
+                        onChange={(e) => setTargetDay(parseInt(e.target.value) || 1)}
+                      />
+                    </div>
+                  </label>
+                </div>
+
+                <div className="importance-selection">
+                  <label>
+                    Wichtigkeit:
+                    <select
+                      value={importance}
+                      onChange={(e) => setImportance(e.target.value as 'low' | 'medium' | 'high' | 'critical')}
+                    >
+                      <option value="low">🟢 Niedrig - Normale Ereignisse</option>
+                      <option value="medium">🟡 Mittel - Wichtige Termine</option>
+                      <option value="high">🟠 Hoch - Kritische Events</option>
+                      <option value="critical">🔴 Kritisch - Weltverändernde Ereignisse</option>
+                    </select>
+                  </label>
+                </div>
+
+                <textarea
+                  placeholder="Beschreibung des Ereignisses (optional)"
+                  value={countdownDescription}
+                  onChange={(e) => setCountdownDescription(e.target.value)}
+                  rows={3}
+                />
+
+                <div className="countdown-info">
+                  <p><strong>⏰ Countdown-System:</strong></p>
+                  <p>Das System zeigt automatisch die verbleibenden Tage bis zum Event an.</p>
+                  <p>Alle Spieler können den Countdown sehen, aber nur DMs können ihn erstellen.</p>
+                  <p>Wichtigkeitsstufe bestimmt die Farbe und Priorität der Anzeige.</p>
+                </div>
+                
+                {/* Countdown Form Actions */}
+                <div className="form-actions">
+                  <button 
+                    className="cancel-button" 
+                    onClick={onClose}
+                  >
+                    Abbrechen
+                  </button>
+                  <button 
+                    className="submit-button" 
+                    onClick={handleSubmit}
+                    disabled={!countdownEventName.trim()}
+                  >
+                    Countdown erstellen
                   </button>
                 </div>
               </div>

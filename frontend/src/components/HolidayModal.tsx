@@ -125,21 +125,37 @@ const HolidayModal: React.FC<HolidayModalProps> = ({
       const response = await API.holidays.create(currentSession, predefined);
       if (response.ok) {
         const holiday = await response.json();
-        setHolidays([...holidays, holiday]);
+        setHolidays(prev => [...prev, holiday]);
+        return holiday;
       } else {
         const errorData = await response.json();
-        if (!errorData.error.includes('already exists')) {
-          setError(errorData.error || 'Failed to add holiday');
+        if (errorData.error.includes('already exists')) {
+          // Silently ignore if holiday already exists
+          return null;
         }
+        throw new Error(errorData.error || 'Failed to add holiday');
       }
     } catch (err) {
-      setError('Failed to add holiday');
+      throw err;
     }
   };
 
   const handleAddAllPredefined = async () => {
+    setError(null);
+    let addedCount = 0;
+    
     for (const predefined of PREDEFINED_HOLIDAYS) {
-      await handleAddPredefinedHoliday(predefined);
+      try {
+        await handleAddPredefinedHoliday(predefined);
+        addedCount++;
+      } catch (err) {
+        // Continue with next holiday if one fails
+        console.error('Failed to add holiday:', predefined.name, err);
+      }
+    }
+    
+    if (addedCount > 0) {
+      await loadHolidays(); // Refresh the list
     }
   };
 

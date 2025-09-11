@@ -396,6 +396,116 @@ const CalendarWithSessions: React.FC = () => {
     .catch(console.error);
   };
 
+  const handleAddArtifact = (artifactOptions: any) => {
+    if (!selectedDay || !artifactOptions.artifactName.trim() || !currentSession) return;
+
+    // Berechne Aufladungszyklen basierend auf dem gewählten Typ
+    const getCycleLength = (type: string, custom?: number) => {
+      switch (type) {
+        case 'lumenis': return 12;
+        case 'umbrath': return 6;
+        case 'manith': return 48;
+        case 'custom': return custom || 7;
+        default: return 7;
+      }
+    };
+
+    const cycleLength = getCycleLength(artifactOptions.chargeType, artifactOptions.customCycle);
+    const artifactTitle = `🔮 ${artifactOptions.artifactName}`;
+    const description = `${artifactOptions.description || ''}\n\nAufladung: Alle ${cycleLength} Tage (${artifactOptions.chargeType === 'custom' ? 'Benutzerdefiniert' : artifactOptions.chargeType})`;
+
+    // Erstelle das Artefakt als wiederkehrendes Event
+    API.events.create({
+      session_id: currentSession,
+      year: currentYear,
+      month: currentMonth,
+      day: selectedDay,
+      title: artifactTitle,
+      description: description,
+      user_role: currentRole,
+      is_recurring: true,
+      recurring_type: 'daily',
+      recurring_interval: cycleLength,
+      artifact_type: artifactOptions.chargeType
+    })
+    .then(() => {
+      // Don't manually refresh - WebSocket will handle it
+      setSelectedDay(null);
+      setShowDayModal(false);
+    })
+    .catch(console.error);
+  };
+
+  const handleAddCountdown = (countdownOptions: any) => {
+    if (!countdownOptions.eventName.trim() || !currentSession) return;
+
+    // Berechne Tage bis zum Zieltermin basierend auf dem letzten abgehakten Tag
+    const calculateDaysUntilFromCompleted = (targetDate: { year: number; month: number; day: number }) => {
+      // Finde den letzten abgehakten Tag
+      let lastCompletedDay = 0;
+      let lastCompletedMonth = currentMonth;
+      let lastCompletedYear = currentYear;
+      
+      // Durchsuche alle abgehakten Tage und finde den letzten
+      completedDays.forEach(day => {
+        const dayValue = day.year * 10000 + day.month * 100 + day.day;
+        const currentLastValue = lastCompletedYear * 10000 + lastCompletedMonth * 100 + lastCompletedDay;
+        if (dayValue > currentLastValue) {
+          lastCompletedDay = day.day;
+          lastCompletedMonth = day.month;
+          lastCompletedYear = day.year;
+        }
+      });
+
+      // Wenn kein abgehakter Tag gefunden, nutze den ersten Tag des aktuellen Monats
+      if (lastCompletedDay === 0) {
+        lastCompletedDay = 1;
+      }
+
+      // Berechne Tage zwischen letztem abgehakten Tag und Zieltermin
+      const startValue = lastCompletedYear * 10000 + lastCompletedMonth * 100 + lastCompletedDay;
+      const targetValue = targetDate.year * 10000 + targetDate.month * 100 + targetDate.day;
+      
+      // Einfache Berechnung - könnte für komplexere Kalender erweitert werden
+      const daysDiff = Math.floor((targetValue - startValue) / 100) * 44 + (targetDate.day - lastCompletedDay);
+      return Math.max(0, daysDiff);
+    };
+
+    const daysUntil = calculateDaysUntilFromCompleted(countdownOptions.targetDate);
+    const importanceEmojis: Record<string, string> = {
+      'low': '🟢',
+      'medium': '🟡', 
+      'high': '🟠',
+      'critical': '🔴'
+    };
+    const importanceEmoji = importanceEmojis[countdownOptions.importance] || '🟡';
+
+    // Grammatik: "Tag" vs "Tage"
+    const dayText = daysUntil === 1 ? 'Tag' : 'Tage';
+    
+    const countdownTitle = `⏰ ${countdownOptions.eventName}`;
+    const description = `${countdownOptions.description || ''}\n\n${importanceEmoji} Zieldatum: ${countdownOptions.targetDate.day}.${countdownOptions.targetDate.month + 1}.${countdownOptions.targetDate.year}\nNoch ${daysUntil} ${dayText} verbleibend\nWichtigkeit: ${countdownOptions.importance.toUpperCase()}`;
+
+    // Erstelle das Countdown-Event am Zieldatum (nicht am aktuellen Tag)
+    API.events.create({
+      session_id: currentSession,
+      year: countdownOptions.targetDate.year,
+      month: countdownOptions.targetDate.month,
+      day: countdownOptions.targetDate.day,
+      title: countdownTitle,
+      description: description,
+      user_role: currentRole, // Wird nur für DMs sichtbar sein
+      countdown_target: `${countdownOptions.targetDate.year}-${countdownOptions.targetDate.month}-${countdownOptions.targetDate.day}`,
+      countdown_importance: countdownOptions.importance
+    })
+    .then(() => {
+      // Don't manually refresh - WebSocket will handle it
+      setSelectedDay(null);
+      setShowDayModal(false);
+    })
+    .catch(console.error);
+  };
+
   const addPartyGroup = () => {
     if (!newGroupName.trim() || !currentSession) return;
 
@@ -518,8 +628,67 @@ const CalendarWithSessions: React.FC = () => {
   };
 
   const getEventsForDay = (day: number): CalendarEvent[] => {
-    return Array.isArray(events) ? events.filter(event => event.day === day) : [];
+    if (!Array.isArray(events)) return [];
+    
+    return events.filter((event: any) => {
+      if (event.day !== day) return false;
+      
+      // Countdown-Events (mit countdown_target) nur für DMs anzeigen im Kalender
+      if (event.countdown_target && event.countdown_target.trim() !== '' && currentRole !== 'DM') {
+        return false;
+      }
+      
+      return true;
+    });
   };
+
+  // Finde aktive Countdown-Events
+  const getActiveCountdowns = () => {
+    const countdownEvents = Array.isArray(events) ? events.filter((event: any) => 
+      event.countdown_target && event.countdown_target.trim() !== ''
+    ) : [];
+
+    return countdownEvents.map((event: any) => {
+      // Parse Zieldatum
+      const [targetYear, targetMonth, targetDay] = event.countdown_target.split('-').map(Number);
+      
+      // Finde letzten abgehakten Tag
+      let lastCompletedDay = 0;
+      let lastCompletedMonth = currentMonth;
+      let lastCompletedYear = currentYear;
+      
+      completedDays.forEach(day => {
+        const dayValue = day.year * 10000 + day.month * 100 + day.day;
+        const currentLastValue = lastCompletedYear * 10000 + lastCompletedMonth * 100 + lastCompletedDay;
+        if (dayValue > currentLastValue) {
+          lastCompletedDay = day.day;
+          lastCompletedMonth = day.month;
+          lastCompletedYear = day.year;
+        }
+      });
+
+      if (lastCompletedDay === 0) {
+        lastCompletedDay = 1;
+      }
+
+      // Berechne verbleibende Tage
+      const startValue = lastCompletedYear * 10000 + lastCompletedMonth * 100 + lastCompletedDay;
+      const targetValue = targetYear * 10000 + targetMonth * 100 + targetDay;
+      const daysDiff = Math.max(0, Math.floor((targetValue - startValue) / 100) * 44 + (targetDay - lastCompletedDay));
+      const dayText = daysDiff === 1 ? 'Tag' : 'Tage';
+
+      return {
+        ...event,
+        daysRemaining: daysDiff,
+        dayText,
+        eventName: event.title.replace('⏰ ', ''),
+        targetDate: { year: targetYear, month: targetMonth, day: targetDay },
+        isActive: daysDiff > 0
+      };
+    }).filter((countdown: any) => countdown.isActive);
+  };
+
+  const activeCountdowns = getActiveCountdowns();
 
   const getEventTypesForDay = (day: number) => {
     const dayEvents = getEventsForDay(day);
@@ -647,6 +816,45 @@ const CalendarWithSessions: React.FC = () => {
   return (
     <div className="calendar">
       <DarkModeToggle />
+
+      {/* Countdown Banner */}
+      {activeCountdowns.length > 0 && (
+        <div className="countdown-banner">
+          <h3>🎯 Aktive Countdowns</h3>
+          <div className="countdown-list">
+            {activeCountdowns.map((countdown: any) => {
+              const importanceEmojis: Record<string, string> = {
+                'low': '🟢',
+                'medium': '🟡', 
+                'high': '🟠',
+                'critical': '🔴'
+              };
+              const importanceEmoji = importanceEmojis[countdown.countdown_importance] || '🟡';
+              
+              return (
+                <div key={countdown.id} className={`countdown-item importance-${countdown.countdown_importance}`}>
+                  {currentRole === 'DM' ? (
+                    // DM sieht vollständiges Event mit Details
+                    <div className="countdown-full">
+                      <strong>{importanceEmoji} {countdown.eventName}</strong>
+                      <span className="countdown-days">Noch {countdown.daysRemaining} {countdown.dayText}</span>
+                      <small>Zieldatum: {countdown.targetDate.day}.{countdown.targetDate.month + 1}.{countdown.targetDate.year}</small>
+                      {countdown.description && <div className="countdown-description">{countdown.description}</div>}
+                    </div>
+                  ) : (
+                    // Spieler sehen nur den Countdown-Namen und Timer, KEINE Event-Details
+                    <div className="countdown-simple">
+                      <strong>{importanceEmoji} {countdown.eventName}</strong>
+                      <span className="countdown-days">Noch {countdown.daysRemaining} {countdown.dayText}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <div className="calendar-header">
         <div className="session-info">
           <small>Session: {currentSession}</small>
@@ -949,8 +1157,12 @@ const CalendarWithSessions: React.FC = () => {
           }}
           onAddEvent={handleAddEvent}
           onAddNote={handleAddNote}
+          onAddArtifact={handleAddArtifact}
+          onAddCountdown={handleAddCountdown}
           onDeleteEvent={deleteEvent}
           onConfirmEvent={confirmEvent}
+          currentYear={currentYear}
+          currentMonth={currentMonth}
         />
       )}
 

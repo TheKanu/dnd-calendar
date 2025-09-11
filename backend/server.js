@@ -126,6 +126,27 @@ db.serialize(() => {
     });
   });
 
+  // Migration: Add artifact_type column
+  db.run(`ALTER TABLE events ADD COLUMN artifact_type TEXT DEFAULT NULL`, (err) => {
+    if (err && !err.message.includes('duplicate column')) {
+      console.error('Artifact migration error:', err);
+    }
+  });
+
+  // Migration: Add countdown columns
+  const countdownColumns = [
+    'countdown_target TEXT DEFAULT NULL',
+    'countdown_importance TEXT DEFAULT NULL'
+  ];
+
+  countdownColumns.forEach(column => {
+    db.run(`ALTER TABLE events ADD COLUMN ${column}`, (err) => {
+      if (err && !err.message.includes('duplicate column')) {
+        console.error('Countdown migration error:', err);
+      }
+    });
+  });
+
   // Create categories table
   db.run(`CREATE TABLE IF NOT EXISTS categories (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -331,12 +352,18 @@ const createRecurringEvents = (session_id, year, month, day, title, description,
 };
 
 app.post('/api/events', authenticateToken, async (req, res) => {
-  const { session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id, user_role } = req.body;
+  const { session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id, user_role, artifact_type, countdown_target, countdown_importance } = req.body;
   
-  // Check if user is DM for event creation (notes are allowed for all)
-  if (!title.startsWith('📝') && user_role !== 'DM') {
+  // Check if user is DM for event creation (notes and artifacts are allowed for all, countdowns only for DMs)
+  if (!title.startsWith('📝') && !title.startsWith('🔮') && user_role !== 'DM') {
     console.log('🚫 Non-DM user attempted to create event:', { user_role, title });
-    return res.status(403).json({ error: 'Only Dungeon Masters can create events. Players can only create notes.' });
+    return res.status(403).json({ error: 'Only Dungeon Masters can create events and countdowns. Players can only create notes and artifacts.' });
+  }
+
+  // Extra check for countdown events - only DMs allowed
+  if (title.startsWith('⏰') && user_role !== 'DM') {
+    console.log('🚫 Non-DM user attempted to create countdown:', { user_role, title });
+    return res.status(403).json({ error: 'Only Dungeon Masters can create countdown events.' });
   }
   
   console.log('📅 Event creation request:', { user_role, title, is_note: title.startsWith('📝') });
@@ -345,8 +372,8 @@ app.post('/api/events', authenticateToken, async (req, res) => {
     // Insert the main event first
     const insertPromise = new Promise((resolve, reject) => {
       db.run(
-        'INSERT INTO events (session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [session_id, year, month, day, title, description, is_recurring ? 1 : 0, recurring_type || null, recurring_interval || 1, recurring_end_date || null, category_id || null],
+        'INSERT INTO events (session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id, artifact_type, countdown_target, countdown_importance) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [session_id, year, month, day, title, description, is_recurring ? 1 : 0, recurring_type || null, recurring_interval || 1, recurring_end_date || null, category_id || null, artifact_type || null, countdown_target || null, countdown_importance || null],
         function(err) {
           if (err) {
             reject(err);

@@ -859,6 +859,235 @@ body.dark-mode .permission-notice p {
   color: #e0e0e0;
 }
 
+/* Artifact form styles */
+.artifact-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.artifact-form input,
+.artifact-form textarea,
+.artifact-form select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.charge-cycle-selection label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 8px;
+}
+
+.custom-cycle {
+  padding: 15px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.custom-cycle label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.custom-cycle input {
+  width: 80px;
+  margin: 0;
+}
+
+.cycle-info {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 6px;
+  padding: 15px;
+  font-size: 13px;
+}
+
+.cycle-info p {
+  margin: 5px 0;
+  color: #1976d2;
+}
+
+.cycle-info strong {
+  color: #0d47a1;
+}
+
+.type-button.artifact-button {
+  background: linear-gradient(145deg, #e1f5fe, #b3e5fc);
+  border-color: #4fc3f7;
+  color: #01579b;
+}
+
+.type-button.artifact-button:hover {
+  border-color: #0277bd;
+  background: linear-gradient(145deg, #b3e5fc, #81d4fa);
+}
+
+/* Dark mode artifact styles */
+body.dark-mode .artifact-form input,
+body.dark-mode .artifact-form textarea,
+body.dark-mode .artifact-form select {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+body.dark-mode .custom-cycle {
+  background: #3a3a3a;
+  border-color: #555;
+}
+
+body.dark-mode .charge-cycle-selection label {
+  color: #e0e0e0;
+}
+
+body.dark-mode .cycle-info {
+  background: #2a3a4a;
+  border-color: #4a5a6a;
+}
+
+body.dark-mode .cycle-info p {
+  color: #87ceeb;
+}
+
+body.dark-mode .cycle-info strong {
+  color: #b0d4f1;
+}
+
+body.dark-mode .type-button.artifact-button {
+  background: linear-gradient(145deg, #3a4a5a, #2f3f4f);
+  border-color: #5a7a9a;
+  color: #87ceeb;
+}
+
+body.dark-mode .type-button.artifact-button:hover {
+  background: linear-gradient(145deg, #4a5a6a, #3f4f5f);
+  border-color: #87ceeb;
+}
+
+/* Countdown form styles */
+.countdown-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.countdown-form input,
+.countdown-form textarea,
+.countdown-form select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.target-date-selection label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 8px;
+}
+
+.date-inputs {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.date-inputs input {
+  flex: 0 0 80px;
+  margin: 0;
+}
+
+.date-inputs select {
+  flex: 1;
+  margin: 0;
+}
+
+.importance-selection label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  font-weight: 500;
+  gap: 8px;
+}
+
+.countdown-info {
+  background: #fff3e0;
+  border: 1px solid #ffcc02;
+  border-radius: 6px;
+  padding: 15px;
+  font-size: 13px;
+}
+
+.countdown-info p {
+  margin: 5px 0;
+  color: #e65100;
+}
+
+.countdown-info strong {
+  color: #bf360c;
+}
+
+.type-button.countdown-button {
+  background: linear-gradient(145deg, #fff3e0, #ffe0b2);
+  border-color: #ff9800;
+  color: #e65100;
+}
+
+.type-button.countdown-button:hover {
+  border-color: #f57c00;
+  background: linear-gradient(145deg, #ffe0b2, #ffcc02);
+}
+
+/* Dark mode countdown styles */
+body.dark-mode .countdown-form input,
+body.dark-mode .countdown-form textarea,
+body.dark-mode .countdown-form select {
+  background: #333;
+  border-color: #555;
+  color: #e0e0e0;
+}
+
+body.dark-mode .target-date-selection label,
+body.dark-mode .importance-selection label {
+  color: #e0e0e0;
+}
+
+body.dark-mode .countdown-info {
+  background: #4a3a2a;
+  border-color: #d4af37;
+}
+
+body.dark-mode .countdown-info p {
+  color: #ffcc02;
+}
+
+body.dark-mode .countdown-info strong {
+  color: #d4af37;
+}
+
+body.dark-mode .type-button.countdown-button {
+  background: linear-gradient(145deg, #4a3a2a, #3f2f1f);
+  border-color: #d4af37;
+  color: #ffcc02;
+}
+
+body.dark-mode .type-button.countdown-button:hover {
+  background: linear-gradient(145deg, #5a4a3a, #4f3f2f);
+  border-color: #ffcc02;
+}
+
 /* Mobile Responsiveness */
 @media (max-width: 768px) {
   .day-modal {

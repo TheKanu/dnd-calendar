@@ -5,6 +5,93 @@
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+/* Countdown Banner Styles */
+.countdown-banner {
+  background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+  border: 2px solid #ff9800;
+  border-radius: 12px;
+  padding: 20px;
+  margin: 0 0 20px 0;
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.2);
+}
+
+.countdown-banner h3 {
+  margin: 0 0 15px 0;
+  color: #e65100;
+  text-align: center;
+  font-size: 1.4em;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.countdown-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  justify-content: center;
+}
+
+.countdown-item {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 8px;
+  padding: 15px;
+  min-width: 250px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-left: 4px solid #ff9800;
+}
+
+.countdown-item.importance-low {
+  border-left-color: #4caf50;
+}
+
+.countdown-item.importance-medium {
+  border-left-color: #ff9800;
+}
+
+.countdown-item.importance-high {
+  border-left-color: #ff5722;
+}
+
+.countdown-item.importance-critical {
+  border-left-color: #f44336;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 2px 8px rgba(244, 67, 54, 0.1); }
+  50% { box-shadow: 0 4px 16px rgba(244, 67, 54, 0.3); }
+  100% { box-shadow: 0 2px 8px rgba(244, 67, 54, 0.1); }
+}
+
+.countdown-full {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.countdown-simple {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.countdown-days {
+  font-weight: bold;
+  font-size: 1.1em;
+  color: #d84315;
+}
+
+.countdown-full strong,
+.countdown-simple strong {
+  color: #bf360c;
+  font-size: 1.1em;
+}
+
+.countdown-full small {
+  color: #666;
+  font-size: 0.9em;
+}
+
 .loading {
   text-align: center;
   padding: 50px;
@@ -669,6 +756,45 @@
 }
 
 /* Dark Mode Styles */
+/* Dark mode countdown styles */
+body.dark-mode .countdown-banner {
+  background: linear-gradient(135deg, #2a2a2a 0%, #3a3a3a 100%);
+  border-color: #d4af37;
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.2);
+}
+
+body.dark-mode .countdown-banner h3 {
+  color: #ffcc02;
+}
+
+body.dark-mode .countdown-item {
+  background: rgba(42, 42, 42, 0.9);
+  color: #e0e0e0;
+}
+
+body.dark-mode .countdown-item.importance-critical {
+  animation: pulseDark 2s infinite;
+}
+
+@keyframes pulseDark {
+  0% { box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2); }
+  50% { box-shadow: 0 4px 16px rgba(244, 67, 54, 0.5); }
+  100% { box-shadow: 0 2px 8px rgba(244, 67, 54, 0.2); }
+}
+
+body.dark-mode .countdown-days {
+  color: #ffcc02;
+}
+
+body.dark-mode .countdown-full strong,
+body.dark-mode .countdown-simple strong {
+  color: #d4af37;
+}
+
+body.dark-mode .countdown-full small {
+  color: #aaa;
+}
+
 body.dark-mode .calendar {
   background: #1a1a1a;
   color: #e0e0e0;
