@@ -1,0 +1,325 @@
+.weather-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: hidden;
+  border-radius: inherit;
+  z-index: 1;
+}
+
+.weather-animation {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Rain Animation */
+.raindrop {
+  position: absolute;
+  top: -5px;
+  width: 1px;
+  height: 10px;
+  background: linear-gradient(to bottom, transparent, #4a90e2);
+  border-radius: 0 0 2px 2px;
+  animation: rainfall 1s linear infinite;
+  opacity: 0.7;
+}
+
+@keyframes rainfall {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  100% {
+    transform: translateY(120px);
+    opacity: 0;
+  }
+}
+
+/* Snowflake Animation */
+.snowflake {
+  position: absolute;
+  top: -20px;
+  color: white;
+  text-shadow: 0 0 2px rgba(0, 0, 0, 0.3);
+  animation: snowfall 4s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes snowfall {
+  0% {
+    transform: translateY(-20px) translateX(0px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(120px) translateX(20px);
+    opacity: 0;
+  }
+}
+
+/* Cloud Animation */
+.cloud {
+  position: absolute;
+  font-size: 16px;
+  opacity: 0.8;
+  animation: cloudDrift 6s ease-in-out infinite;
+}
+
+@keyframes cloudDrift {
+  0%, 100% {
+    transform: translateX(-5px);
+  }
+  50% {
+    transform: translateX(5px);
+  }
+}
+
+/* Lightning Animation */
+.lightning-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.lightning {
+  position: absolute;
+  top: 20%;
+  left: 30%;
+  width: 2px;
+  height: 60%;
+  background: #fff;
+  box-shadow: 0 0 6px #4a90e2, 0 0 12px #4a90e2;
+  opacity: 0;
+  animation: lightning-flash 3s infinite;
+  transform: rotate(15deg);
+}
+
+.lightning-2 {
+  left: 60%;
+  top: 10%;
+  height: 70%;
+  animation-delay: 1.5s;
+  transform: rotate(-10deg);
+}
+
+@keyframes lightning-flash {
+  0%, 90%, 100% {
+    opacity: 0;
+  }
+  1%, 3%, 5% {
+    opacity: 1;
+  }
+}
+
+/* Sun Rays Animation */
+.sun-rays {
+  position: absolute;
+  top: 10%;
+  right: 15%;
+  width: 20px;
+  height: 20px;
+}
+
+.sun-ray {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 15px;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #ffd700, transparent);
+  transform-origin: left center;
+  animation: sunRayGlow 4s ease-in-out infinite;
+}
+
+@keyframes sunRayGlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+  }
+}
+
+/* Thunderstorm specific effects */
+.thunderstorm {
+  background: rgba(50, 50, 70, 0.1);
+  animation: thunderstormFlash 3s infinite;
+}
+
+@keyframes thunderstormFlash {
+  0%, 90%, 100% {
+    background: rgba(50, 50, 70, 0.1);
+  }
+  1%, 3%, 5% {
+    background: rgba(255, 255, 255, 0.3);
+  }
+}
+
+/* Snow specific effects */
+.snow {
+  background: rgba(230, 230, 250, 0.05);
+}
+
+/* Fog Effects */
+.fog-layers {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.fog-layer {
+  position: absolute;
+  font-size: 18px;
+  opacity: 0.6;
+  animation: fogDrift 8s ease-in-out infinite;
+}
+
+@keyframes fogDrift {
+  0%, 100% {
+    transform: translateX(-10px);
+    opacity: 0.4;
+  }
+  50% {
+    transform: translateX(10px);
+    opacity: 0.8;
+  }
+}
+
+/* Wind Effects */
+.wind-effects {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.wind-line {
+  position: absolute;
+  width: 30px;
+  height: 1px;
+  background: linear-gradient(to right, transparent, rgba(180, 180, 180, 0.6), transparent);
+  animation: windGust 1.5s ease-in-out infinite;
+  left: -30px;
+}
+
+.wind-emoji {
+  position: absolute;
+  top: 15%;
+  right: 10%;
+  font-size: 16px;
+  opacity: 0.7;
+  animation: windEmoji 2s ease-in-out infinite;
+}
+
+@keyframes windGust {
+  0% {
+    transform: translateX(0px);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateX(120px);
+    opacity: 0;
+  }
+}
+
+@keyframes windEmoji {
+  0%, 100% {
+    transform: translateX(0px) scale(1);
+  }
+  50% {
+    transform: translateX(5px) scale(1.1);
+  }
+}
+
+/* Seasonal Effects */
+.falling-leaves .leaf {
+  position: absolute;
+  top: -10px;
+  font-size: 12px;
+  animation: leafFall 5s linear infinite;
+  opacity: 0.8;
+}
+
+@keyframes leafFall {
+  0% {
+    transform: translateY(-10px) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(120px) rotate(360deg);
+    opacity: 0;
+  }
+}
+
+.spring-petals .petal {
+  position: absolute;
+  top: -10px;
+  font-size: 10px;
+  animation: petalDrift 6s ease-in-out infinite;
+  opacity: 0.6;
+}
+
+@keyframes petalDrift {
+  0% {
+    transform: translateY(-10px) translateX(0px) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(100px) translateX(30px) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+/* Reduce animation intensity on smaller screens */
+@media (max-width: 768px) {
+  .raindrop {
+    animation-duration: 0.8s;
+  }
+  
+  .snowflake {
+    animation-duration: 3s;
+  }
+  
+  .sun-ray {
+    width: 10px;
+    height: 1px;
+  }
+  
+  .weather-overlay {
+    opacity: 0.7;
+  }
+}
+
+/* Dark mode adjustments */
+[data-theme="dark"] .raindrop {
+  background: linear-gradient(to bottom, transparent, #6bb6ff);
+}
+
+[data-theme="dark"] .lightning {
+  box-shadow: 0 0 6px #6bb6ff, 0 0 12px #6bb6ff;
+}
+
+[data-theme="dark"] .sun-ray {
+  background: linear-gradient(to right, transparent, #ffeb3b, transparent);
+}

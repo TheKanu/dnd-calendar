@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import apiConfig from '../config/environment';
 
-export const useSocket = (sessionId: string | null) => {
+export const useSocket = (sessionId: string | null, role: 'DM' | 'Player' = 'Player', username: string = 'Anonymous') => {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
@@ -15,16 +15,20 @@ export const useSocket = (sessionId: string | null) => {
       return;
     }
 
-    console.log('🔌 Setting up socket for session:', sessionId);
+    console.log('🔌 Setting up socket for session:', sessionId, 'as', role);
 
     // Create socket connection
     socketRef.current = io(apiConfig.SOCKET_URL);
 
     // Wait for connection before joining
     socketRef.current.on('connect', () => {
-      console.log('🔌 Socket connected, joining session:', sessionId);
+      console.log('🔌 Socket connected, joining session:', sessionId, 'as', role);
       if (socketRef.current) {
-        socketRef.current.emit('join-session', sessionId);
+        socketRef.current.emit('join-session', {
+          sessionId,
+          role,
+          username
+        });
       }
     });
 
@@ -36,7 +40,7 @@ export const useSocket = (sessionId: string | null) => {
         socketRef.current = null;
       }
     };
-  }, [sessionId]);
+  }, [sessionId, role, username]);
 
   const emitEvent = (event: string, data: any) => {
     if (socketRef.current) {

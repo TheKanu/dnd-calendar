@@ -13,6 +13,9 @@ import DayModal from './DayModal';
 import CategoryManager from './CategoryManager';
 import SearchModal from './SearchModal';
 import TimeTravelModal from './TimeTravelModal';
+import HolidayModal from './HolidayModal';
+import WeatherSelector from './WeatherSelector';
+import WeatherAnimation from './WeatherAnimation';
 import { API } from '../utils/api';
 import './Calendar.css';
 
@@ -22,24 +25,28 @@ const CalendarWithSessions: React.FC = () => {
   const [partyGroups, setPartyGroups] = useState<PartyGroup[]>([]);
   const [completedDays, setCompletedDays] = useState<CompletedDay[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [weatherData, setWeatherData] = useState<any[]>([]);
+  const [holidays, setHolidays] = useState<any[]>([]);
   const [currentMonth, setCurrentMonth] = useState(0);
   const [currentYear, setCurrentYear] = useState(1048);
   const [selectedDay, setSelectedDay] = useState<number | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [showTimeTravelModal, setShowTimeTravelModal] = useState(false);
+  const [showHolidayModal, setShowHolidayModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
   const [currentSession, setCurrentSession] = useState<string | null>(null);
+  const [currentRole, setCurrentRole] = useState<'DM' | 'Player'>('Player');
   const [draggedGroup, setDraggedGroup] = useState<PartyGroup | null>(null);
   const [draggedEvent, setDraggedEvent] = useState<CalendarEvent | null>(null);
   const [dragOverDay, setDragOverDay] = useState<number | null>(null);
   const [newGroupName, setNewGroupName] = useState('');
   const [newGroupColor, setNewGroupColor] = useState('#ff6b6b');
 
-  const { onEvent } = useSocket(currentSession);
+  const { onEvent } = useSocket(currentSession, currentRole, 'User');
   const { getWeekdays, isTransitioning } = useLanguage();
   const initialYearSet = useRef(false);
 
@@ -87,6 +94,24 @@ const CalendarWithSessions: React.FC = () => {
     })
       .then(res => res.json())
       .then(setCategories)
+      .catch(console.error);
+  }, [currentSession]);
+
+  const fetchWeatherData = React.useCallback(() => {
+    if (!currentSession) return;
+    
+    API.weather.getForMonth(currentSession, currentYear, currentMonth)
+      .then(res => res.json())
+      .then(setWeatherData)
+      .catch(console.error);
+  }, [currentSession, currentYear, currentMonth]);
+
+  const fetchHolidays = React.useCallback(() => {
+    if (!currentSession) return;
+    
+    API.holidays.getAll(currentSession)
+      .then(res => res.json())
+      .then(setHolidays)
       .catch(console.error);
   }, [currentSession]);
 
@@ -141,8 +166,10 @@ const CalendarWithSessions: React.FC = () => {
       fetchPartyGroups();
       fetchCompletedDays();
       fetchCategories();
+      fetchWeatherData();
+      fetchHolidays();
     }
-  }, [config, currentMonth, currentYear, currentSession, fetchEvents, fetchPartyGroups, fetchCompletedDays, fetchCategories]);
+  }, [config, currentMonth, currentYear, currentSession, fetchEvents, fetchPartyGroups, fetchCompletedDays, fetchCategories, fetchWeatherData, fetchHolidays]);
 
   // WebSocket event listeners
   useEffect(() => {
@@ -226,15 +253,33 @@ const CalendarWithSessions: React.FC = () => {
           // Event was moved from a different month, we might need to refresh that too
           // For now, just refresh current month
         }
+      }),
+
+      onEvent('weather-updated', (data: any) => {
+        console.log('Weather updated:', data);
+        fetchWeatherData(); // Refresh weather data
+      }),
+
+      onEvent('weather-deleted', (data: any) => {
+        console.log('Weather deleted:', data);
+        fetchWeatherData(); // Refresh weather data
+      }),
+      onEvent('holiday-added', (data: any) => {
+        console.log('Holiday added:', data);
+        fetchHolidays(); // Refresh holiday data
+      }),
+      onEvent('holiday-deleted', (data: any) => {
+        console.log('Holiday deleted:', data);
+        fetchHolidays(); // Refresh holiday data
       })
     ];
 
     return () => {
       unsubscribeEvents.forEach(unsubscribe => unsubscribe());
     };
-  }, [currentSession, currentMonth, currentYear, onEvent, fetchEvents, fetchPartyGroups, fetchCompletedDays, fetchCategories]);
+  }, [currentSession, currentMonth, currentYear, onEvent, fetchEvents, fetchPartyGroups, fetchCompletedDays, fetchCategories, fetchWeatherData, fetchHolidays]);
 
-  const onSessionSelect = async (sessionId: string) => {
+  const onSessionSelect = async (sessionId: string, role: 'DM' | 'Player') => {
     // First validate that the session actually exists
     try {
       const validationResponse = await API.sessions.exists(sessionId);
@@ -255,6 +300,8 @@ const CalendarWithSessions: React.FC = () => {
     
     // Session exists, proceed to join it
     setCurrentSession(sessionId);
+    setCurrentRole(role);
+    console.log(`🎭 Joined session ${sessionId} as ${role}`);
     
     // Try to get session info to set start date (only if year hasn't been manually set)
     try {
@@ -302,6 +349,7 @@ const CalendarWithSessions: React.FC = () => {
       day: selectedDay,
       title: title,
       description: description,
+      user_role: currentRole,
       ...(categoryId && { category_id: categoryId }),
       ...(recurringOptions?.isRecurring && {
         is_recurring: true,
@@ -317,7 +365,13 @@ const CalendarWithSessions: React.FC = () => {
       setSelectedDay(null);
       setShowDayModal(false);
     })
-    .catch(console.error);
+    .catch((error) => {
+      console.error('Error creating event:', error);
+      // Show error message to user if creation fails
+      if (error.message && error.message.includes('Only Dungeon Masters')) {
+        alert('⚔️ Nur Dungeon Master können Events erstellen!\nSpieler können nur Notizen erstellen.');
+      }
+    });
   };
 
   const handleAddNote = (content: string) => {
@@ -331,7 +385,8 @@ const CalendarWithSessions: React.FC = () => {
       month: currentMonth,
       day: selectedDay,
       title: '📝 Notiz',
-      description: content
+      description: content,
+      user_role: currentRole
     })
     .then(() => {
       // Don't manually refresh - WebSocket will handle it
@@ -364,13 +419,11 @@ const CalendarWithSessions: React.FC = () => {
     }
   };
 
-  const deleteEvent = (eventId: number) => {
+  const deleteEvent = (eventId: number, deleteSeries: boolean = false) => {
     if (!currentSession) return;
     
-    if (window.confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
-      API.events.delete(eventId, currentSession)
-        .catch(console.error);
-    }
+    API.events.delete(eventId, currentSession, deleteSeries)
+      .catch(console.error);
   };
 
   const confirmEvent = (eventId: number, confirmed: boolean) => {
@@ -475,6 +528,10 @@ const CalendarWithSessions: React.FC = () => {
     return { hasNotes, hasEvents, totalCount: dayEvents.length };
   };
 
+  const getHolidaysForDay = (day: number) => {
+    return Array.isArray(holidays) ? holidays.filter(holiday => holiday.month === currentMonth && holiday.day === day) : [];
+  };
+
   const getPartyGroupsForDay = (day: number): PartyGroup[] => {
     return Array.isArray(partyGroups) ? partyGroups.filter(group => 
       group.current_year === currentYear &&
@@ -485,6 +542,38 @@ const CalendarWithSessions: React.FC = () => {
 
   const isDayCompleted = (day: number): boolean => {
     return Array.isArray(completedDays) ? completedDays.some(cd => cd.day === day) : false;
+  };
+
+  const getWeatherForDay = (day: number): string | undefined => {
+    return Array.isArray(weatherData) 
+      ? weatherData.find(w => w.day === day)?.weather_type 
+      : undefined;
+  };
+
+  const setWeatherForDay = (day: number, weatherType: string) => {
+    if (!currentSession || currentRole !== 'DM') return;
+
+    API.weather.set(currentSession, {
+      year: currentYear,
+      month: currentMonth,
+      day: day,
+      weather_type: weatherType
+    }).catch(console.error);
+  };
+
+  const clearWeatherForDay = (day: number) => {
+    if (!currentSession || currentRole !== 'DM') return;
+
+    API.weather.delete(currentSession, currentYear, currentMonth, day)
+      .catch(console.error);
+  };
+
+  const getCurrentSeason = (): 'spring' | 'summer' | 'autumn' | 'winter' => {
+    // Based on fantasy calendar months - adjust as needed
+    if (currentMonth >= 2 && currentMonth <= 4) return 'spring';    // Thael'orne to Pel'anor
+    if (currentMonth >= 5 && currentMonth <= 7) return 'summer';    // Drac'uial to Shad'morn
+    if (currentMonth >= 8 && currentMonth <= 10) return 'autumn';   // Ley'thurin to Tun'giliath
+    return 'winter'; // Mor'galad, Cir'annen, Auro'ithil, Man'alasse
   };
 
   const handleNavigateToDate = (year: number, month: number, day?: number) => {
@@ -562,6 +651,12 @@ const CalendarWithSessions: React.FC = () => {
         <div className="session-info">
           <small>Session: {currentSession}</small>
           <button onClick={() => setCurrentSession(null)}>Change Session</button>
+          <button 
+            onClick={() => setCurrentRole(currentRole === 'DM' ? 'Player' : 'DM')}
+            title={`Switch to ${currentRole === 'DM' ? 'Player' : 'DM'}`}
+          >
+            Change Team
+          </button>
           <LanguageSelector />
           <div className="search-container">
             <input
@@ -598,6 +693,9 @@ const CalendarWithSessions: React.FC = () => {
             )}
           </div>
         </div>
+        <div className="role-display">
+          <h3>{currentRole === 'DM' ? '👑 Dungeon Master' : '⚔️ Spieler'}</h3>
+        </div>
         <h1>🌙 Aetherial Calender ✨</h1>
         <div className="calendar-nav">
           <button 
@@ -622,6 +720,15 @@ const CalendarWithSessions: React.FC = () => {
             >
               🕰️
             </button>
+            {currentRole === 'DM' && (
+              <button 
+                className="holiday-btn"
+                onClick={() => setShowHolidayModal(true)}
+                title="Holiday Management - Manage holidays"
+              >
+                🎉
+              </button>
+            )}
           </div>
           <button 
             onClick={() => {
@@ -673,7 +780,9 @@ const CalendarWithSessions: React.FC = () => {
               const eventTypes = day > 0 ? getEventTypesForDay(day) : { hasNotes: false, hasEvents: false, totalCount: 0 };
               const moonPhases = day > 0 ? getMoonPhasesForDay(day) : [];
               const partyGroupsHere = day > 0 ? getPartyGroupsForDay(day) : [];
+              const dayHolidays = day > 0 ? getHolidaysForDay(day) : [];
               const isCompleted = day > 0 ? isDayCompleted(day) : false;
+              const currentWeather = day > 0 ? getWeatherForDay(day) : undefined;
               const isDragOver = dragOverDay === day;
               const isDraggingSameDay = draggedEvent && draggedEvent.year === currentYear && 
                                         draggedEvent.month === currentMonth && draggedEvent.day === day;
@@ -681,7 +790,7 @@ const CalendarWithSessions: React.FC = () => {
               return (
                 <div
                   key={dayIndex}
-                  className={`calendar-day ${day === 0 ? 'empty' : ''} ${selectedDay === day ? 'selected' : ''} ${isCompleted ? 'completed' : ''} ${isDragOver ? 'drag-over' : ''} ${isDraggingSameDay ? 'invalid-drop' : ''}`}
+                  className={`calendar-day ${day === 0 ? 'empty' : ''} ${selectedDay === day ? 'selected' : ''} ${isCompleted ? 'completed' : ''} ${isDragOver ? 'drag-over' : ''} ${isDraggingSameDay ? 'invalid-drop' : ''} ${dayHolidays.length > 0 ? 'has-holidays' : ''}`}
                   onClick={() => {
                     if (day > 0) {
                       setSelectedDay(day);
@@ -695,18 +804,45 @@ const CalendarWithSessions: React.FC = () => {
                 >
                   {day > 0 && (
                     <>
+                      {/* Weather Animation Overlay */}
+                      {currentWeather && (
+                        <WeatherAnimation 
+                          weatherType={currentWeather}
+                          season={getCurrentSeason()}
+                        />
+                      )}
                       <div className="day-header">
                         <div className="day-number">{day}</div>
-                        <button 
-                          className={`completion-toggle ${isCompleted ? 'completed' : ''}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleDayCompletion(day);
-                          }}
-                          title={isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
-                        >
-                          {isCompleted ? '✅' : '⭕'}
-                        </button>
+                        <div className="day-controls">
+                          {currentRole === 'DM' && (
+                            <div onClick={(e) => e.stopPropagation()}>
+                              <WeatherSelector
+                                currentWeather={currentWeather}
+                                onWeatherSelect={(weatherType) => setWeatherForDay(day, weatherType)}
+                                onWeatherClear={() => clearWeatherForDay(day)}
+                              />
+                            </div>
+                          )}
+                          {currentRole === 'DM' ? (
+                            <button 
+                              className={`completion-toggle ${isCompleted ? 'completed' : ''}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleDayCompletion(day);
+                              }}
+                              title={isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
+                            >
+                              {isCompleted ? '✅' : '⭕'}
+                            </button>
+                          ) : (
+                            <div 
+                              className={`completion-indicator ${isCompleted ? 'completed' : ''}`}
+                              title={isCompleted ? 'Tag abgeschlossen' : 'Tag nicht abgeschlossen'}
+                            >
+                              {isCompleted ? '✅' : '⭕'}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       
                       {/* Event/Note indicators */}
@@ -716,6 +852,26 @@ const CalendarWithSessions: React.FC = () => {
                           {eventTypes.hasNotes && <div className="indicator note-indicator" title={`${dayEvents.filter(e => e.title.startsWith('📝')).length} Notiz(en)`}>📝</div>}
                           {eventTypes.totalCount > 2 && (
                             <div className="indicator count-indicator" title={`${eventTypes.totalCount} Einträge insgesamt`}>+{eventTypes.totalCount - 2}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Holiday indicators */}
+                      {dayHolidays.length > 0 && (
+                        <div className="holiday-indicators">
+                          {dayHolidays.slice(0, 2).map((holiday, index) => (
+                            <div 
+                              key={holiday.id} 
+                              className={`holiday-indicator holiday-${holiday.type}`}
+                              title={`${holiday.name} (${holiday.type}): ${holiday.description}`}
+                            >
+                              {holiday.type === 'worldly' ? '🌍' : holiday.type === 'magical' ? '✨' : '🏰'}
+                            </div>
+                          ))}
+                          {dayHolidays.length > 2 && (
+                            <div className="holiday-indicator more-holidays" title={`+${dayHolidays.length - 2} more holidays`}>
+                              +{dayHolidays.length - 2}
+                            </div>
                           )}
                         </div>
                       )}
@@ -786,6 +942,7 @@ const CalendarWithSessions: React.FC = () => {
           day={selectedDay}
           existingEvents={getEventsForDay(selectedDay)}
           categories={categories}
+          currentRole={currentRole}
           onClose={() => {
             setShowDayModal(false);
             setSelectedDay(null);
@@ -814,6 +971,14 @@ const CalendarWithSessions: React.FC = () => {
           currentYear={currentYear}
           currentMonth={currentMonth}
           onNavigateToDate={handleNavigateToDate}
+        />
+      )}
+
+      {showHolidayModal && currentSession && config && (
+        <HolidayModal
+          currentSession={currentSession}
+          config={config}
+          onClose={() => setShowHolidayModal(false)}
         />
       )}
     </div>

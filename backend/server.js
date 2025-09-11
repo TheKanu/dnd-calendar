@@ -144,6 +144,33 @@ db.serialize(() => {
       console.error('Category migration error:', err);
     }
   });
+
+  // Create weather table
+  db.run(`CREATE TABLE IF NOT EXISTS weather (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    month INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    weather_type TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, year, month, day),
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+  )`);
+
+  // Create holidays table
+  db.run(`CREATE TABLE IF NOT EXISTS holidays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    month INTEGER NOT NULL,
+    day INTEGER NOT NULL,
+    type TEXT NOT NULL DEFAULT 'regional',
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(session_id, month, day, name),
+    FOREIGN KEY (session_id) REFERENCES sessions(id)
+  )`);
 });
 
 // Authentication routes
@@ -304,7 +331,15 @@ const createRecurringEvents = (session_id, year, month, day, title, description,
 };
 
 app.post('/api/events', authenticateToken, async (req, res) => {
-  const { session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id } = req.body;
+  const { session_id, year, month, day, title, description, is_recurring, recurring_type, recurring_interval, recurring_end_date, category_id, user_role } = req.body;
+  
+  // Check if user is DM for event creation (notes are allowed for all)
+  if (!title.startsWith('📝') && user_role !== 'DM') {
+    console.log('🚫 Non-DM user attempted to create event:', { user_role, title });
+    return res.status(403).json({ error: 'Only Dungeon Masters can create events. Players can only create notes.' });
+  }
+  
+  console.log('📅 Event creation request:', { user_role, title, is_note: title.startsWith('📝') });
   
   try {
     // Insert the main event first
@@ -550,24 +585,41 @@ app.delete('/api/groups/:groupId', authenticateToken, async (req, res) => {
 app.delete('/api/events/:eventId', authenticateToken, async (req, res) => {
   try {
     const { eventId } = req.params;
-    const { sessionId } = req.body;
+    const { sessionId, deleteSeries } = req.body;
+    
+    console.log('🗑️ Delete request:', { eventId, sessionId, deleteSeries });
     
     // Get event details before deleting for broadcast
     const event = await sessionManager.getEvent(eventId);
+    console.log('📄 Event to delete:', event);
     
-    const result = await sessionManager.deleteEvent(eventId);
+    let result;
+    if (deleteSeries && (event.is_recurring || event.recurring_parent_id)) {
+      // Delete entire series
+      const parentId = event.recurring_parent_id || eventId;
+      console.log('🔄 Deleting series with parentId:', parentId);
+      result = await sessionManager.deleteEventSeries(parentId);
+      console.log('✅ Series deletion result:', result);
+    } else {
+      // Delete single event
+      console.log('📅 Deleting single event:', eventId);
+      result = await sessionManager.deleteEvent(eventId);
+      console.log('✅ Single deletion result:', result);
+    }
     
     // Broadcast to all clients in the session
     if (sessionId && event) {
       io.to(sessionId).emit('event-deleted', {
         eventId: parseInt(eventId),
         event: event,
+        deleteSeries: deleteSeries,
         timestamp: new Date()
       });
     }
     
     res.json(result);
   } catch (err) {
+    console.error('💥 Delete error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -792,6 +844,199 @@ app.get('/api/sessions/:sessionId/search', authenticateToken, async (req, res) =
     });
   } catch (err) {
     console.error('Search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Weather API
+app.get('/api/sessions/:sessionId/weather/:year/:month', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId, year, month } = req.params;
+    
+    db.all(
+      'SELECT * FROM weather WHERE session_id = ? AND year = ? AND month = ? ORDER BY day',
+      [sessionId, year, month],
+      (err, rows) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        res.json(rows);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sessions/:sessionId/weather', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { year, month, day, weather_type } = req.body;
+    
+    // Use INSERT OR REPLACE to handle updates
+    db.run(
+      'INSERT OR REPLACE INTO weather (session_id, year, month, day, weather_type) VALUES (?, ?, ?, ?, ?)',
+      [sessionId, year, month, day, weather_type],
+      function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        const weatherData = {
+          id: this.lastID,
+          session_id: sessionId,
+          year,
+          month,
+          day,
+          weather_type
+        };
+        
+        // Broadcast to all clients in the session
+        io.to(sessionId).emit('weather-updated', {
+          weather: weatherData,
+          timestamp: new Date()
+        });
+        
+        res.json(weatherData);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/sessions/:sessionId/weather/:year/:month/:day', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId, year, month, day } = req.params;
+    
+    db.run(
+      'DELETE FROM weather WHERE session_id = ? AND year = ? AND month = ? AND day = ?',
+      [sessionId, year, month, day],
+      function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        // Broadcast to all clients in the session
+        io.to(sessionId).emit('weather-deleted', {
+          sessionId,
+          year: parseInt(year),
+          month: parseInt(month),
+          day: parseInt(day),
+          timestamp: new Date()
+        });
+        
+        res.json({ success: true, changes: this.changes });
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Holiday API
+app.get('/api/sessions/:sessionId/holidays', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    db.all(
+      'SELECT * FROM holidays WHERE session_id = ? ORDER BY month, day',
+      [sessionId],
+      (err, rows) => {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        res.json(rows);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/sessions/:sessionId/holidays', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const { name, month, day, type, description } = req.body;
+    
+    if (!name || month === undefined || day === undefined) {
+      return res.status(400).json({ error: 'Name, month, and day are required' });
+    }
+    
+    db.run(
+      'INSERT INTO holidays (session_id, name, month, day, type, description) VALUES (?, ?, ?, ?, ?, ?)',
+      [sessionId, name, month, day, type || 'regional', description || ''],
+      function(err) {
+        if (err) {
+          if (err.message.includes('UNIQUE constraint failed')) {
+            res.status(400).json({ error: 'A holiday with this name already exists on this date' });
+          } else {
+            res.status(500).json({ error: err.message });
+          }
+          return;
+        }
+        
+        const holidayData = {
+          id: this.lastID,
+          session_id: sessionId,
+          name,
+          month,
+          day,
+          type: type || 'regional',
+          description: description || ''
+        };
+        
+        // Broadcast to all clients in the session
+        io.to(sessionId).emit('holiday-added', {
+          holiday: holidayData,
+          timestamp: new Date()
+        });
+        
+        res.json(holidayData);
+      }
+    );
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/holidays/:holidayId', authenticateToken, async (req, res) => {
+  try {
+    const { holidayId } = req.params;
+    const { sessionId } = req.body;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'Session ID is required' });
+    }
+    
+    db.run(
+      'DELETE FROM holidays WHERE id = ? AND session_id = ?',
+      [holidayId, sessionId],
+      function(err) {
+        if (err) {
+          res.status(500).json({ error: err.message });
+          return;
+        }
+        
+        if (this.changes === 0) {
+          res.status(404).json({ error: 'Holiday not found' });
+          return;
+        }
+        
+        // Broadcast to all clients in the session
+        io.to(sessionId).emit('holiday-deleted', {
+          holidayId: parseInt(holidayId),
+          timestamp: new Date()
+        });
+        
+        res.json({ success: true, changes: this.changes });
+      }
+    );
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

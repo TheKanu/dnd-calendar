@@ -211,6 +211,19 @@ class SessionManager {
     });
   }
 
+  deleteEventSeries(parentId) {
+    return new Promise((resolve, reject) => {
+      this.db.run(
+        'DELETE FROM events WHERE id = ? OR recurring_parent_id = ?',
+        [parentId, parentId],
+        function(err) {
+          if (err) reject(err);
+          else resolve({ parentId, seriesDeleted: this.changes > 0, deletedCount: this.changes });
+        }
+      );
+    });
+  }
+
   updateEventConfirmation(eventId, confirmed) {
     return new Promise((resolve, reject) => {
       this.db.run(

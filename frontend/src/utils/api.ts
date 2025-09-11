@@ -42,10 +42,10 @@ export const API = {
         method: 'POST',
         body: JSON.stringify(eventData)
       }),
-    delete: (eventId: number, sessionId: string) =>
+    delete: (eventId: number, sessionId: string, deleteSeries: boolean = false) =>
       authFetch(`${apiConfig.API_BASE_URL}/api/events/${eventId}`, {
         method: 'DELETE',
-        body: JSON.stringify({ sessionId })
+        body: JSON.stringify({ sessionId, deleteSeries })
       }),
     updateConfirmation: (eventId: number, sessionId: string, confirmed: boolean) =>
       authFetch(`${apiConfig.API_BASE_URL}/api/events/${eventId}/confirm`, {
@@ -120,5 +120,32 @@ export const API = {
       if (filters?.month) params.append('month', filters.month.toString());
       return authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/search?${params}`);
     }
+  },
+  weather: {
+    getForMonth: (sessionId: string, year: number, month: number) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/weather/${year}/${month}`),
+    set: (sessionId: string, weatherData: { year: number; month: number; day: number; weather_type: string }) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/weather`, {
+        method: 'POST',
+        body: JSON.stringify(weatherData)
+      }),
+    delete: (sessionId: string, year: number, month: number, day: number) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/weather/${year}/${month}/${day}`, {
+        method: 'DELETE'
+      })
+  },
+  holidays: {
+    getAll: (sessionId: string) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/holidays`),
+    create: (sessionId: string, holidayData: { name: string; month: number; day: number; type: string; description: string }) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/sessions/${sessionId}/holidays`, {
+        method: 'POST',
+        body: JSON.stringify(holidayData)
+      }),
+    delete: (holidayId: number, sessionId: string) => 
+      authFetch(`${apiConfig.API_BASE_URL}/api/holidays/${holidayId}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ sessionId })
+      })
   }
 };

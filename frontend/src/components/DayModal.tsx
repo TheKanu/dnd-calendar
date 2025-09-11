@@ -17,16 +17,17 @@ interface Category {
 
 interface DayModalProps {
   day: number;
-  existingEvents: Array<{id: number; title: string; description?: string; confirmed?: boolean; is_recurring?: boolean; category_id?: number}>;
+  existingEvents: Array<{id: number; title: string; description?: string; confirmed?: boolean; is_recurring?: boolean; category_id?: number; recurring_parent_id?: number}>;
   onClose: () => void;
   onAddEvent: (title: string, description: string, recurringOptions?: RecurringEventOptions, categoryId?: number) => void;
   onAddNote: (content: string) => void;
-  onDeleteEvent?: (eventId: number) => void;
+  onDeleteEvent?: (eventId: number, deleteSeries?: boolean) => void;
   onConfirmEvent?: (eventId: number, confirmed: boolean) => void;
   categories?: Category[];
+  currentRole?: 'DM' | 'Player';
 }
 
-const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAddEvent, onAddNote, onDeleteEvent, onConfirmEvent, categories = [] }) => {
+const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAddEvent, onAddNote, onDeleteEvent, onConfirmEvent, categories = [], currentRole = 'Player' }) => {
   const [selectedType, setSelectedType] = useState<'event' | 'note' | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -40,6 +41,10 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
   
   // Category state
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | undefined>(undefined);
+
+  // Deletion modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState<{id: number; title: string; is_recurring?: boolean; recurring_parent_id?: number} | null>(null);
 
   const handleSubmit = () => {
     if (selectedType === 'event' && title.trim()) {
@@ -78,6 +83,23 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
   
   const getCategoryForEvent = (event: any) => {
     return categories?.find?.(cat => cat.id === event.category_id);
+  };
+
+  const handleDeleteClick = (event: any) => {
+    setEventToDelete(event);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteConfirm = (deleteSeries: boolean = false) => {
+    if (eventToDelete && onDeleteEvent) {
+      onDeleteEvent(eventToDelete.id, deleteSeries);
+      setShowDeleteModal(false);
+      setEventToDelete(null);
+    }
+  };
+
+  const isPartOfSeries = (event: any) => {
+    return event.is_recurring || event.recurring_parent_id;
   };
 
   return (
@@ -132,7 +154,7 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                           {onDeleteEvent && (
                             <button 
                               className="delete-item-btn"
-                              onClick={() => onDeleteEvent(event.id)}
+                              onClick={() => handleDeleteClick(event)}
                               title="Event löschen"
                             >
                               ×
@@ -157,7 +179,7 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                           {onDeleteEvent && (
                             <button 
                               className="delete-item-btn"
-                              onClick={() => onDeleteEvent(note.id)}
+                              onClick={() => handleDeleteClick(note)}
                               title="Notiz löschen"
                             >
                               ×
@@ -175,14 +197,22 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
             {/* Add New Section */}
             <div className="type-selection">
               <h4>{existingEvents.length > 0 ? 'Neuen Eintrag hinzufügen' : 'Was möchtest du hinzufügen?'}</h4>
+              {currentRole !== 'DM' && (
+                <div className="permission-notice">
+                  <p>⚔️ Als Spieler kannst du nur Notizen erstellen.</p>
+                  <p>👑 Events können nur vom Dungeon Master erstellt werden.</p>
+                </div>
+              )}
               <div className="type-buttons">
-                <button 
-                  className="type-button event-button" 
-                  onClick={() => handleTypeSelect('event')}
-                >
-                  📅 Event
-                  <small>Einmalige oder wiederkehrende Termine</small>
-                </button>
+                {currentRole === 'DM' && (
+                  <button 
+                    className="type-button event-button" 
+                    onClick={() => handleTypeSelect('event')}
+                  >
+                    📅 Event
+                    <small>Einmalige oder wiederkehrende Termine</small>
+                  </button>
+                )}
                 <button 
                   className="type-button note-button" 
                   onClick={() => handleTypeSelect('note')}
@@ -349,6 +379,67 @@ const DayModal: React.FC<DayModalProps> = ({ day, existingEvents, onClose, onAdd
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && eventToDelete && (
+          <div className="delete-modal-overlay" onClick={() => setShowDeleteModal(false)}>
+            <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="delete-modal-header">
+                <h4>Event löschen</h4>
+                <button className="close-button" onClick={() => setShowDeleteModal(false)}>×</button>
+              </div>
+              
+              <div className="delete-modal-content">
+                <p>
+                  <strong>{eventToDelete.title}</strong>
+                  {isPartOfSeries(eventToDelete) && (
+                    <span className="series-indicator"> (Teil einer Serie)</span>
+                  )}
+                </p>
+                
+                {isPartOfSeries(eventToDelete) ? (
+                  <div className="delete-options">
+                    <p>Was möchtest du löschen?</p>
+                    <div className="delete-option-buttons">
+                      <button 
+                        className="delete-option-btn single-event"
+                        onClick={() => handleDeleteConfirm(false)}
+                      >
+                        📅 Nur dieses Event
+                        <small>Löscht nur diesen einen Termin</small>
+                      </button>
+                      <button 
+                        className="delete-option-btn event-series"
+                        onClick={() => handleDeleteConfirm(true)}
+                      >
+                        🔄 Ganze Serie
+                        <small>Löscht alle wiederkehrenden Termine</small>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="delete-single">
+                    <p>Dieses Event wirklich löschen?</p>
+                    <div className="delete-actions">
+                      <button 
+                        className="cancel-button"
+                        onClick={() => setShowDeleteModal(false)}
+                      >
+                        Abbrechen
+                      </button>
+                      <button 
+                        className="delete-confirm-btn"
+                        onClick={() => handleDeleteConfirm(false)}
+                      >
+                        Löschen
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>

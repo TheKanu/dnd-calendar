@@ -24,6 +24,7 @@ export interface CalendarEvent {
   description?: string;
   confirmed?: boolean;
   is_recurring?: boolean;
+  recurring_parent_id?: number;
   category_id?: number;
   created_at: string;
 }

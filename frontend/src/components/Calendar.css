@@ -542,6 +542,12 @@
   margin-bottom: 5px;
 }
 
+.day-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .day-indicators {
   display: flex;
   gap: 3px;
@@ -609,6 +615,23 @@
 .completion-toggle:hover {
   background: rgba(0,0,0,0.1);
   transform: scale(1.1);
+}
+
+.completion-indicator {
+  font-size: 14px;
+  padding: 2px;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  cursor: default;
+}
+
+.completion-indicator.completed {
+  opacity: 0.8;
 }
 
 .calendar-day.completed {
@@ -738,6 +761,14 @@ body.dark-mode .count-indicator {
 
 body.dark-mode .completion-toggle:hover {
   background: rgba(255,255,255,0.1);
+}
+
+body.dark-mode .completion-indicator {
+  opacity: 0.5;
+}
+
+body.dark-mode .completion-indicator.completed {
+  opacity: 0.7;
 }
 
 body.dark-mode .party-controls {
@@ -937,4 +968,112 @@ body.dark-mode .event-form textarea {
 body.dark-mode .event-form input:focus,
 body.dark-mode .event-form textarea:focus {
   border-color: #d4af37;
+}
+
+/* Holiday Styles */
+.calendar-day.has-holidays {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.1), rgba(255, 215, 0, 0.05));
+  border-left: 3px solid #ffd700;
+}
+
+.holiday-indicators {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+
+.holiday-indicator {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  cursor: help;
+  transition: transform 0.2s ease;
+}
+
+.holiday-indicator:hover {
+  transform: scale(1.2);
+  z-index: 10;
+}
+
+.holiday-indicator.holiday-worldly {
+  border: 1px solid #2e7d32;
+  color: #2e7d32;
+}
+
+.holiday-indicator.holiday-magical {
+  border: 1px solid #7b1fa2;
+  color: #7b1fa2;
+  background: rgba(123, 31, 162, 0.1);
+}
+
+.holiday-indicator.holiday-regional {
+  border: 1px solid #d32f2f;
+  color: #d32f2f;
+  background: rgba(211, 47, 47, 0.1);
+}
+
+.holiday-indicator.more-holidays {
+  background: #ffd700;
+  color: #333;
+  font-size: 8px;
+  font-weight: bold;
+  border: 1px solid #ffb300;
+}
+
+.holiday-btn {
+  background: #ffd700 !important;
+  color: #333 !important;
+  border: 1px solid #ffb300;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-left: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.holiday-btn:hover {
+  background: #ffb300 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+/* Dark mode holiday styles */
+body.dark-mode .calendar-day.has-holidays {
+  background: linear-gradient(135deg, rgba(255, 215, 0, 0.15), rgba(255, 215, 0, 0.08));
+  border-left: 3px solid #ffd700;
+}
+
+body.dark-mode .holiday-indicator {
+  background: rgba(42, 42, 42, 0.95);
+  border-color: #555;
+}
+
+body.dark-mode .holiday-indicator.holiday-worldly {
+  border-color: #4caf50;
+  color: #4caf50;
+}
+
+body.dark-mode .holiday-indicator.holiday-magical {
+  border-color: #9c27b0;
+  color: #9c27b0;
+  background: rgba(156, 39, 176, 0.15);
+}
+
+body.dark-mode .holiday-indicator.holiday-regional {
+  border-color: #f44336;
+  color: #f44336;
+  background: rgba(244, 67, 54, 0.15);
+}
+
+body.dark-mode .holiday-indicator.more-holidays {
+  background: #ffd700;
+  color: #333;
+  border-color: #ffb300;
 }

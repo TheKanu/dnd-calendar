@@ -3,7 +3,7 @@ import { API } from '../utils/api';
 import './SessionManager.css';
 
 interface SessionManagerProps {
-  onSessionSelect: (sessionId: string) => void;
+  onSessionSelect: (sessionId: string, role: 'DM' | 'Player') => void;
 }
 
 const SessionManager: React.FC<SessionManagerProps> = ({ onSessionSelect }) => {
@@ -41,7 +41,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ onSessionSelect }) => {
         const data = await response.json();
         if (data.exists) {
           // Session exists, can join
-          onSessionSelect(joinSessionId.trim());
+          onSessionSelect(joinSessionId.trim(), 'Player');
         } else {
           // Session doesn't exist
           setError('Session nicht gefunden. Überprüfe die Session-ID oder erstelle eine neue Session.');
@@ -88,7 +88,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ onSessionSelect }) => {
       });
 
       if (response.ok) {
-        onSessionSelect(createSessionId.trim());
+        onSessionSelect(createSessionId.trim(), 'DM');
       } else {
         const data = await response.json();
         setError(data.error || 'Fehler beim Erstellen der Session');
@@ -412,7 +412,7 @@ const SessionManager: React.FC<SessionManagerProps> = ({ onSessionSelect }) => {
                       <div className="session-actions">
                         <button 
                           className="join-session-button" 
-                          onClick={() => onSessionSelect(session.id)}
+                          onClick={() => onSessionSelect(session.id, 'Player')}
                         >
                           🚪 Session Beitreten
                         </button>
